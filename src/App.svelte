@@ -1,16 +1,18 @@
-<script>
-  let judges = $state([]);
-  let error = $state('');
+<script lang="ts">
+  import type { JudgeCard, JudgesFile } from './lib/types'
+
+  let judges = $state<JudgeCard[]>([])
+  let error = $state('')
 
   async function loadJudges() {
     try {
-      const res = await fetch(`${import.meta.env.BASE_URL}data/judges.json`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      judges = data.cards ?? [];
-      error = '';
+      const res = await fetch(`${import.meta.env.BASE_URL}data/judges.json`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = (await res.json()) as JudgesFile
+      judges = data.cards ?? []
+      error = ''
     } catch (e) {
-      error = String(e);
+      error = String(e)
     }
   }
 </script>
