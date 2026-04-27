@@ -3,8 +3,18 @@
 
   type Props = {
     message: string
+    mode?: 'inline' | 'floating'
+    collapsed?: boolean
+    onCollapsedChange?: (collapsed: boolean) => void
+    onRequestReset?: () => void
   }
-  let { message }: Props = $props()
+  let {
+    message,
+    mode = 'inline',
+    collapsed = false,
+    onCollapsedChange = () => {},
+    onRequestReset = () => {},
+  }: Props = $props()
 
   const iconBase = `${import.meta.env.BASE_URL}GM_icon/`
   const idleIcon = `${iconBase}0_ほほえみ.png`
@@ -18,10 +28,14 @@
 
   let typeTimer: number | null = null
   let mouthTimer: number | null = null
+  let tapTimer: number | null = null
+  let rootEl: HTMLElement | null = null
   let runId = 0
   let mouthFrame = 0
   let typingActive = false
   let typedText = ''
+  let lastAvatarTapAt = 0
+  let resetMenuOpen = $state(false)
 
   onMount(() => {
     preloadIcons()
@@ -30,9 +44,17 @@
     const onChange = () => {
       reducedMotion = media.matches
     }
+    const onPointerDown = (event: PointerEvent) => {
+      if (mode !== 'floating' || !resetMenuOpen) return
+      const target = event.target
+      if (target instanceof Node && rootEl?.contains(target)) return
+      resetMenuOpen = false
+    }
     media.addEventListener('change', onChange)
+    document.addEventListener('pointerdown', onPointerDown)
     return () => {
       media.removeEventListener('change', onChange)
+      document.removeEventListener('pointerdown', onPointerDown)
       clearTimers()
     }
   })
@@ -110,6 +132,10 @@
       window.clearTimeout(typeTimer)
       typeTimer = null
     }
+    if (tapTimer !== null) {
+      window.clearTimeout(tapTimer)
+      tapTimer = null
+    }
     typingActive = false
     clearMouthTimer()
   }
@@ -120,13 +146,66 @@
       mouthTimer = null
     }
   }
+
+  function handleAvatarClick() {
+    if (mode !== 'floating') return
+    const now = Date.now()
+    if (now - lastAvatarTapAt <= 350) {
+      if (tapTimer !== null) {
+        window.clearTimeout(tapTimer)
+        tapTimer = null
+      }
+      lastAvatarTapAt = 0
+      resetMenuOpen = !resetMenuOpen
+      return
+    }
+
+    lastAvatarTapAt = now
+    tapTimer = window.setTimeout(() => {
+      onCollapsedChange(!collapsed)
+      resetMenuOpen = false
+      tapTimer = null
+    }, 260)
+  }
+
+  function handleRequestReset() {
+    resetMenuOpen = false
+    onRequestReset()
+  }
 </script>
 
-<section class="gm-guide" aria-label={`Game Master: ${message}`}>
-  <div class="gm-avatar-frame" aria-hidden="true">
-    <img class="gm-avatar" src={iconSrc} alt="" width="256" height="256" />
-  </div>
-  <div class="gm-bubble">
+<section
+  bind:this={rootEl}
+  class="gm-guide"
+  class:gm-guide-floating={mode === 'floating'}
+  class:gm-guide-collapsed={mode === 'floating' && collapsed}
+  aria-label={`Game Master: ${message}`}
+>
+  {#if mode === 'floating'}
+    <button
+      type="button"
+      class="gm-avatar-button"
+      onclick={handleAvatarClick}
+      aria-label={collapsed ? 'GMを開く' : 'GMを閉じる'}
+    >
+      <span class="gm-avatar-frame" aria-hidden="true">
+        <img class="gm-avatar" src={iconSrc} alt="" width="256" height="256" />
+      </span>
+    </button>
+    {#if resetMenuOpen}
+      <div class="gm-floating-menu">
+        <button type="button" onclick={handleRequestReset} data-audio="confirm">
+          セットアップに戻る
+        </button>
+      </div>
+    {/if}
+  {:else}
+    <div class="gm-avatar-frame" aria-hidden="true">
+      <img class="gm-avatar" src={iconSrc} alt="" width="256" height="256" />
+    </div>
+  {/if}
+
+  <div class="gm-bubble" hidden={mode === 'floating' && collapsed}>
     <p class="gm-label">Game Master</p>
     <p class="gm-message" aria-hidden="true">
       {displayed}<span class="gm-cursor" class:gm-cursor-hidden={!isTyping}>▍</span>

@@ -35,6 +35,7 @@
 
   <button
     onclick={onNext}
+    data-audio="confirm"
     class="ui-button-primary w-full px-5 py-3 rounded-lg font-bold active:scale-[0.98] transition"
   >
     {isLastRound ? '結果発表' : '次のラウンドへ'}

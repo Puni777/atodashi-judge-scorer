@@ -5,7 +5,13 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_THEME_ID, Phase } from '../types'
 import type { JudgeCard, ScorerConfig } from '../types'
-import { ScoreSession, rankedStandings } from './session.svelte'
+import { ScoreSession, parseScoreSessionSnapshot, rankedStandings } from './session.svelte'
+import { CountdownTimer, type Scheduler } from './timer.svelte'
+
+const noopScheduler: Scheduler = {
+  setInterval: () => 'fake-handle',
+  clearInterval: () => {},
+}
 
 const JUDGE_2OPT: JudgeCard = {
   id: 'jdg_001',
@@ -204,6 +210,74 @@ describe('ScoreSession', () => {
     s.players[2]!.score = 3
     const ranked = s.standings()
     expect(ranked.map((p) => p.name)).toEqual(['B', 'C', 'A'])
+  })
+
+  it('snapshot からフェーズ、点数、判断入力、履歴、タイマーを復元できる', () => {
+    const s = new ScoreSession(new CountdownTimer(noopScheduler))
+    start(s, ['A', 'B', 'C'], { totalRounds: 3, timerSeconds: 60, themeId: 'cyber' })
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b, c] = s.children()
+    if (!b || !c) throw new Error('children should exist')
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 1)
+    s.advanceToSecond()
+    s.submitSecond(b.id, 1)
+    s.submitSecond(c.id, 1)
+    s.advanceToFinal()
+    s.submitFinal(b.id, 1)
+
+    const snapshot = s.toSnapshot(1_000)
+    const parsed = parseScoreSessionSnapshot(JSON.parse(JSON.stringify(snapshot)))
+    expect(parsed).not.toBeNull()
+
+    const restored = new ScoreSession(new CountdownTimer(noopScheduler))
+    restored.restoreSnapshot(parsed!, 16_000)
+    expect(restored.phase).toBe(Phase.FinalJudgment)
+    expect(restored.config.themeId).toBe('cyber')
+    expect(restored.players.map((p) => p.name)).toEqual(['A', 'B', 'C'])
+    expect(restored.roundState?.firstJudgments).toEqual({ 1: 0, 2: 1 })
+    expect(restored.roundState?.secondJudgments).toEqual({ 1: 1, 2: 1 })
+    expect(restored.roundState?.finalJudgments).toEqual({ 1: 1 })
+    expect(restored.history).toEqual([])
+    expect(restored.timer.isRunning).toBe(true)
+    expect(restored.timer.remainingSeconds).toBe(45)
+  })
+
+  it('期限切れのタイマーを snapshot から復元できる', () => {
+    const s = new ScoreSession(new CountdownTimer(noopScheduler))
+    start(s, ['A', 'B', 'C'], { totalRounds: 3, timerSeconds: 10 })
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    for (const child of s.children()) s.submitFirst(child.id, 0)
+    s.advanceToSecond()
+    for (const child of s.children()) s.submitSecond(child.id, 0)
+    s.advanceToFinal()
+
+    const snapshot = s.toSnapshot(1_000)
+    const restored = new ScoreSession(new CountdownTimer(noopScheduler))
+    restored.restoreSnapshot(snapshot, 12_000)
+    expect(restored.phase).toBe(Phase.FinalJudgment)
+    expect(restored.timer.isRunning).toBe(false)
+    expect(restored.timer.remainingSeconds).toBe(0)
+    expect(restored.timer.expired).toBe(true)
+  })
+
+  it('不正な snapshot は parse で null になる', () => {
+    expect(parseScoreSessionSnapshot({ sessionVersion: 999 })).toBeNull()
+    expect(parseScoreSessionSnapshot({ sessionVersion: 1, phase: 'BAD' })).toBeNull()
+  })
+
+  it('resetToSetup は進行中ゲームを初期化する', () => {
+    const s = new ScoreSession()
+    start(s)
+    s.resetToSetup()
+    expect(s.phase).toBe(Phase.Setup)
+    expect(s.players).toEqual([])
+    expect(s.roundState).toBeNull()
+    expect(s.history).toEqual([])
   })
 })
 

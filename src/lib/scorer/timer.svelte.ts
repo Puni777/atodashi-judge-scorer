@@ -21,6 +21,14 @@ export type Scheduler = {
   clearInterval: (handle: unknown) => void
 }
 
+export type CountdownTimerSnapshot = {
+  totalSeconds: number
+  remainingSeconds: number
+  isRunning: boolean
+  expired: boolean
+  endsAt: number | null
+}
+
 const defaultScheduler: Scheduler = {
   setInterval: (cb, ms) => globalThis.setInterval(cb, ms),
   clearInterval: (handle) => globalThis.clearInterval(handle as ReturnType<typeof setInterval>),
@@ -54,10 +62,7 @@ export class CountdownTimer {
   }
 
   stop(): void {
-    if (this.handle !== null) {
-      this.scheduler.clearInterval(this.handle)
-      this.handle = null
-    }
+    this.clearHandle()
     if (this.isRunning) {
       this.isRunning = false
       this.emit('stopped')
@@ -80,6 +85,36 @@ export class CountdownTimer {
     this.listeners[event].delete(listener as never)
   }
 
+  toSnapshot(now: number = Date.now()): CountdownTimerSnapshot {
+    return {
+      totalSeconds: this.totalSeconds,
+      remainingSeconds: this.remainingSeconds,
+      isRunning: this.isRunning,
+      expired: this.expired,
+      endsAt: this.isRunning ? now + this.remainingSeconds * 1000 : null,
+    }
+  }
+
+  restoreSnapshot(snapshot: CountdownTimerSnapshot, now: number = Date.now()): void {
+    this.clearHandle()
+    this.totalSeconds = Math.max(0, Math.floor(snapshot.totalSeconds))
+
+    if (snapshot.isRunning && snapshot.endsAt !== null) {
+      const remainingSeconds = Math.max(0, Math.ceil((snapshot.endsAt - now) / 1000))
+      this.remainingSeconds = remainingSeconds
+      this.expired = remainingSeconds <= 0
+      this.isRunning = remainingSeconds > 0
+      if (this.isRunning) {
+        this.handle = this.scheduler.setInterval(() => this.tick(), 1000)
+      }
+      return
+    }
+
+    this.remainingSeconds = Math.max(0, Math.floor(snapshot.remainingSeconds))
+    this.isRunning = false
+    this.expired = snapshot.expired
+  }
+
   /** テストや UI から「強制 1 秒進める」操作（fake timer 用にも使える） */
   tick(): void {
     if (!this.isRunning) return
@@ -93,6 +128,13 @@ export class CountdownTimer {
         this.handle = null
       }
       this.emit('expired')
+    }
+  }
+
+  private clearHandle(): void {
+    if (this.handle !== null) {
+      this.scheduler.clearInterval(this.handle)
+      this.handle = null
     }
   }
 

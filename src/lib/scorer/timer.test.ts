@@ -104,4 +104,29 @@ describe('CountdownTimer', () => {
       vi.useRealTimers()
     }
   })
+
+  it('snapshot 復元時に endsAt から残り時間を再計算する', () => {
+    const t = new CountdownTimer(noopScheduler)
+    t.start(60)
+    const snapshot = t.toSnapshot(1000)
+
+    const restored = new CountdownTimer(noopScheduler)
+    restored.restoreSnapshot(snapshot, 46_000)
+    expect(restored.isRunning).toBe(true)
+    expect(restored.totalSeconds).toBe(60)
+    expect(restored.remainingSeconds).toBe(15)
+    expect(restored.expired).toBe(false)
+  })
+
+  it('snapshot 復元時に期限切れなら expired になる', () => {
+    const t = new CountdownTimer(noopScheduler)
+    t.start(10)
+    const snapshot = t.toSnapshot(1_000)
+
+    const restored = new CountdownTimer(noopScheduler)
+    restored.restoreSnapshot(snapshot, 12_000)
+    expect(restored.isRunning).toBe(false)
+    expect(restored.remainingSeconds).toBe(0)
+    expect(restored.expired).toBe(true)
+  })
 })

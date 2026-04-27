@@ -5,8 +5,9 @@
   type Props = {
     players: Player[]
     onRestart: () => void
+    onSetup: () => void
   }
-  let { players, onRestart }: Props = $props()
+  let { players, onRestart, onSetup }: Props = $props()
 
   let ranked = $derived(rankedStandings(players))
 
@@ -43,8 +44,16 @@
 
   <button
     onclick={onRestart}
+    data-audio="confirm"
     class="ui-button-primary w-full px-5 py-3 rounded-lg font-bold active:scale-[0.98] transition"
   >
     もう 1 試合
+  </button>
+  <button
+    onclick={onSetup}
+    data-audio="confirm"
+    class="ui-button-secondary w-full px-5 py-3 rounded-lg font-bold active:scale-[0.98] transition"
+  >
+    セットアップに戻る
   </button>
 </section>

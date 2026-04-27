@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "se": {
+    "tap": {
+      "label": "カーソル移動",
+      "src": "audio/se/cursor-move.mp3",
+      "volume": 0.45
+    },
+    "confirm": {
+      "label": "決定ボタンを押す",
+      "src": "audio/se/confirm-button.mp3",
+      "volume": 0.65
+    },
+    "roundScore": {
+      "label": "スコア表示",
+      "src": "audio/se/round-score.mp3",
+      "volume": 0.8
+    },
+    "finalScore": {
+      "label": "最終スコア表示",
+      "src": "audio/se/final-score.mp3",
+      "volume": 0.85
+    },
+    "alarm": {
+      "label": "アラーム",
+      "src": "audio/se/alarm.mp3",
+      "volume": 0.4
+    }
+  },
+  "bgm": {
+    "main": {
+      "label": "クマノミの夢",
+      "src": "audio/bgm/kumanomi-no-yume.mp3",
+      "volume": 0.14,
+      "loop": true,
+      "autoplay": true
+    }
+  }
+}

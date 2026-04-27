@@ -319,6 +319,55 @@ button, input {
   accent-color: var(--accent);
 }
 
+.ui-switch {
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.ui-switch input {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.ui-switch span[aria-hidden='true'] {
+  background: var(--disabled-bg);
+  border: 1px solid var(--panel-soft-border);
+  border-radius: 9999px;
+  display: block;
+  height: 1.75rem;
+  position: relative;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+  width: 3.25rem;
+}
+
+.ui-switch span[aria-hidden='true']::before {
+  background: var(--text-muted);
+  border-radius: 9999px;
+  content: '';
+  height: 1.2rem;
+  left: 0.22rem;
+  position: absolute;
+  top: 0.22rem;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+  width: 1.2rem;
+}
+
+.ui-switch input:checked + span[aria-hidden='true'] {
+  background: var(--accent-muted-bg);
+  border-color: var(--accent-border);
+}
+
+.ui-switch input:checked + span[aria-hidden='true']::before {
+  background: var(--accent-border);
+  transform: translateX(1.45rem);
+}
+
 .ui-button-primary {
   background: var(--accent);
   border: 1px solid var(--accent-border);
@@ -328,6 +377,16 @@ button, input {
 
 .ui-button-primary:hover:not(:disabled) {
   background: var(--accent-hover);
+}
+
+.ui-button-secondary {
+  background: var(--panel-soft-bg);
+  border: 1px solid var(--panel-soft-border);
+  color: var(--text-main);
+}
+
+.ui-button-secondary:hover:not(:disabled) {
+  background: var(--choice-hover);
 }
 
 .ui-button-disabled {
@@ -507,6 +566,41 @@ button, input {
   gap: 0.75rem;
 }
 
+.app-shell-floating-gm {
+  padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
+}
+
+.gm-guide-floating {
+  align-items: flex-end;
+  animation: gm-floating-fade-in 1s ease forwards;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 0.65rem;
+  left: 1rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+  opacity: 0;
+  position: fixed;
+  transform: translateY(0.45rem);
+  z-index: 50;
+}
+
+.gm-guide-floating .gm-bubble {
+  width: min(18rem, calc(100vw - 6.5rem));
+}
+
+.gm-guide-floating.gm-guide-collapsed {
+  max-width: 4.5rem;
+}
+
+.gm-avatar-button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
 .gm-avatar-frame {
   align-items: center;
   background:
@@ -588,9 +682,83 @@ button, input {
   opacity: 0;
 }
 
+.gm-floating-menu {
+  background:
+    linear-gradient(var(--gm-bg), var(--gm-bg)) padding-box,
+    linear-gradient(135deg, var(--gm-border), rgb(255 255 255 / 0.08)) border-box;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  box-shadow: var(--gm-shadow);
+  padding: 0.35rem;
+  position: absolute;
+  bottom: 5.1rem;
+  left: 0;
+}
+
+.gm-floating-menu button {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: 0.55rem;
+  color: var(--danger-text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-width: 9.5rem;
+  padding: 0.65rem 0.75rem;
+}
+
 @keyframes gm-cursor-blink {
   50% {
     opacity: 0;
+  }
+}
+
+@keyframes gm-floating-fade-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell-floating-gm {
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+  }
+
+  .gm-guide-floating {
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    gap: 0.55rem;
+    left: 0.75rem;
+    max-width: min(21rem, calc(100vw - 1.5rem));
+  }
+
+  .gm-guide-floating .gm-avatar-frame {
+    height: 3.65rem;
+    width: 3.65rem;
+  }
+
+  .gm-guide-floating .gm-bubble {
+    min-height: 4.65rem;
+    padding: 0.72rem 0.85rem;
+    width: min(16rem, calc(100vw - 5.9rem));
+  }
+
+  .gm-guide-floating .gm-message {
+    font-size: 0.85rem;
+    min-height: 2.9rem;
+  }
+
+  .gm-guide-floating .gm-label {
+    font-size: 0.65rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .gm-guide-floating.gm-guide-collapsed {
+    max-width: 3.65rem;
+  }
+
+  .gm-guide-floating .gm-floating-menu {
+    bottom: 4.25rem;
   }
 }
 
@@ -604,9 +772,22 @@ button, input {
     width: 3.75rem;
   }
 
+  .gm-guide-floating .gm-avatar-frame {
+    height: 3.5rem;
+    width: 3.5rem;
+  }
+
+  .gm-guide-floating.gm-guide-collapsed {
+    max-width: 3.5rem;
+  }
+
   .gm-bubble {
     min-height: 4.75rem;
     padding: 0.75rem 0.85rem;
+  }
+
+  .gm-guide-floating .gm-bubble {
+    width: min(15rem, calc(100vw - 5.5rem));
   }
 
   .gm-message {
@@ -618,5 +799,11 @@ button, input {
 @media (prefers-reduced-motion: reduce) {
   .gm-cursor {
     animation: none;
+  }
+
+  .gm-guide-floating {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }

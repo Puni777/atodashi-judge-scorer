@@ -68,6 +68,7 @@
   <button
     onclick={confirm}
     disabled={!selectedId}
+    data-audio="confirm"
     class="w-full px-5 py-3 rounded-lg font-bold transition {selectedId
       ? 'ui-button-primary active:scale-[0.98]'
       : 'ui-button-disabled'}"

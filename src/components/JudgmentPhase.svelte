@@ -53,6 +53,7 @@
   <button
     onclick={onAdvance}
     disabled={!allDone}
+    data-audio="confirm"
     class="w-full px-5 py-3 rounded-lg font-bold transition {allDone
       ? 'ui-button-primary active:scale-[0.98]'
       : 'ui-button-disabled'}"

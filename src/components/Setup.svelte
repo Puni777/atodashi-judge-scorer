@@ -11,11 +11,23 @@
     ) => void
     selectedThemeId?: ThemeId
     onThemeChange?: (themeId: ThemeId) => void
+    floatingGmEnabled?: boolean
+    onFloatingGmChange?: (enabled: boolean) => void
+    seEnabled?: boolean
+    bgmEnabled?: boolean
+    onSeEnabledChange?: (enabled: boolean) => void
+    onBgmEnabledChange?: (enabled: boolean) => void
   }
   let {
     onStart,
     selectedThemeId = DEFAULT_THEME_ID,
     onThemeChange = () => {},
+    floatingGmEnabled = true,
+    onFloatingGmChange = () => {},
+    seEnabled = true,
+    bgmEnabled = true,
+    onSeEnabledChange = () => {},
+    onBgmEnabledChange = () => {},
   }: Props = $props()
 
   let count = $state(3)
@@ -55,6 +67,18 @@
 
   function setTheme(nextThemeId: ThemeId) {
     onThemeChange(nextThemeId)
+  }
+
+  function setFloatingGm(enabled: boolean) {
+    onFloatingGmChange(enabled)
+  }
+
+  function setSeEnabled(enabled: boolean) {
+    onSeEnabledChange(enabled)
+  }
+
+  function setBgmEnabled(enabled: boolean) {
+    onBgmEnabledChange(enabled)
   }
 
   function submit() {
@@ -158,10 +182,61 @@
     </div>
   </div>
 
+  <div class="ui-card-soft rounded-lg p-4 flex items-center justify-between gap-3">
+    <div>
+      <p class="font-bold ui-text-main">GM固定表示</p>
+      <p class="text-xs ui-text-dim">スマホでは進行中も右下にGMを残します。</p>
+    </div>
+    <label class="ui-switch">
+      <input
+        type="checkbox"
+        checked={floatingGmEnabled}
+        onchange={(e) => setFloatingGm(e.currentTarget.checked)}
+      />
+      <span aria-hidden="true"></span>
+      <span class="sr-only">GM固定表示</span>
+    </label>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div class="ui-card-soft rounded-lg p-4 flex items-center justify-between gap-3">
+      <div>
+        <p class="font-bold ui-text-main">SE</p>
+        <p class="text-xs ui-text-dim">タップや得点表示の効果音。</p>
+      </div>
+      <label class="ui-switch">
+        <input
+          type="checkbox"
+          checked={seEnabled}
+          onchange={(e) => setSeEnabled(e.currentTarget.checked)}
+        />
+        <span aria-hidden="true"></span>
+        <span class="sr-only">SE</span>
+      </label>
+    </div>
+
+    <div class="ui-card-soft rounded-lg p-4 flex items-center justify-between gap-3">
+      <div>
+        <p class="font-bold ui-text-main">BGM</p>
+        <p class="text-xs ui-text-dim">クマノミの夢を流します。</p>
+      </div>
+      <label class="ui-switch">
+        <input
+          type="checkbox"
+          checked={bgmEnabled}
+          onchange={(e) => setBgmEnabled(e.currentTarget.checked)}
+        />
+        <span aria-hidden="true"></span>
+        <span class="sr-only">BGM</span>
+      </label>
+    </div>
+  </div>
+
   {#if error}<p class="ui-text-danger text-sm">{error}</p>{/if}
 
   <button
     onclick={submit}
+    data-audio="confirm"
     class="ui-button-primary w-full px-5 py-3 rounded-lg active:scale-[0.98] transition font-bold"
   >
     ゲーム開始

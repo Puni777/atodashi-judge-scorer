@@ -28,3 +28,6 @@ dist-ssr
 
 # GM icon source files copied to public/GM_icon/
 /GM_icon/
+
+# Audio source files copied to public/audio/
+/SEとMusic/
