@@ -3,7 +3,7 @@
  * 数値が Python 実装と一致することを確認するのが目的。
  */
 import { describe, expect, it } from 'vitest'
-import { Phase } from '../types'
+import { DEFAULT_THEME_ID, Phase } from '../types'
 import type { JudgeCard, ScorerConfig } from '../types'
 import { ScoreSession, rankedStandings } from './session.svelte'
 
@@ -151,6 +151,16 @@ describe('ScoreSession', () => {
     const s = new ScoreSession()
     start(s, ['A', 'B', 'C', 'D'])
     expect(s.config.totalRounds).toBe(4)
+  })
+
+  it('themeId 未指定なら Tailwind、指定時は設定に保存される', () => {
+    const fallback = new ScoreSession()
+    start(fallback)
+    expect(fallback.config.themeId).toBe(DEFAULT_THEME_ID)
+
+    const cyber = new ScoreSession()
+    start(cyber, ['A', 'B', 'C'], { totalRounds: null, timerSeconds: 0, themeId: 'cyber' })
+    expect(cyber.config.themeId).toBe('cyber')
   })
 
   it('timerSeconds 設定なし（0）ならタイマーは start されない', () => {

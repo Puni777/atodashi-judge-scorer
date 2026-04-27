@@ -31,10 +31,10 @@
 </script>
 
 <section class="space-y-4">
-  <div class="rounded-xl bg-white/10 backdrop-blur p-5 ring-1 ring-white/20 space-y-2">
-    <p class="text-xs text-slate-400 uppercase tracking-widest">{phaseLabel}</p>
-    <h2 class="text-2xl font-bold text-white">{judge.question}</h2>
-    {#if hint}<p class="text-sm text-slate-300">{hint}</p>{/if}
+  <div class="ui-card p-5 space-y-2">
+    <p class="text-xs ui-text-dim uppercase tracking-widest">{phaseLabel}</p>
+    <h2 class="text-2xl font-bold ui-text-main">{judge.question}</h2>
+    {#if hint}<p class="text-sm ui-text-muted">{hint}</p>{/if}
   </div>
 
   <div class="space-y-3">
@@ -54,8 +54,8 @@
     onclick={onAdvance}
     disabled={!allDone}
     class="w-full px-5 py-3 rounded-lg font-bold transition {allDone
-      ? 'bg-purple-500 hover:bg-purple-400 text-white shadow-lg shadow-purple-500/30 active:scale-[0.98]'
-      : 'bg-white/5 text-slate-500 cursor-not-allowed'}"
+      ? 'ui-button-primary active:scale-[0.98]'
+      : 'ui-button-disabled'}"
   >
     {advanceLabel}
   </button>

@@ -16,14 +16,14 @@
   )
 </script>
 
-<div class="rounded-xl p-4 transition ring-1 {currentOption !== undefined
-  ? 'bg-emerald-400/10 ring-emerald-400/40'
-  : 'bg-white/5 ring-white/15 ring-dashed'}">
+<div class="ui-judgment-row rounded-xl p-4 transition {currentOption !== undefined
+  ? 'ui-judgment-row-complete'
+  : 'ui-judgment-row-empty'}">
   <div class="flex items-baseline justify-between gap-3">
-    <p class="text-base font-bold text-white">{child.name}</p>
+    <p class="text-base font-bold ui-text-main">{child.name}</p>
     {#if prevOptionText !== null && prevLabel}
-      <p class="text-xs text-slate-400">
-        {prevLabel}: <span class="text-slate-200">{prevOptionText}</span>
+      <p class="text-xs ui-text-dim">
+        {prevLabel}: <span class="ui-text-soft">{prevOptionText}</span>
       </p>
     {/if}
   </div>
@@ -33,9 +33,9 @@
       <button
         type="button"
         onclick={() => onSelect(child.id, idx)}
-        class="min-h-[56px] px-5 rounded-full font-bold transition ring-2 {currentOption === idx
-          ? 'bg-purple-500 ring-purple-400 text-white shadow-lg shadow-purple-500/30'
-          : 'bg-black/20 ring-white/15 text-slate-200 hover:bg-white/10'}"
+        class="ui-choice min-h-[56px] px-5 rounded-full font-bold transition {currentOption === idx
+          ? 'ui-choice-active'
+          : ''}"
       >
         {opt}
       </button>

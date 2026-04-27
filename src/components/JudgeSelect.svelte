@@ -27,22 +27,22 @@
 </script>
 
 <section class="space-y-4">
-  <div class="rounded-xl bg-white/10 backdrop-blur p-5 ring-1 ring-white/20 space-y-3">
+  <div class="ui-card p-5 space-y-3">
     <h2 class="text-lg font-bold">ジャッジを選んでください</h2>
-    <p class="text-sm text-slate-300">親が場に出すジャッジカードを 1 枚タップ</p>
+    <p class="text-sm ui-text-muted">親が場に出すジャッジカードを 1 枚タップ</p>
     <div class="relative">
       <input
         type="search"
         bind:value={query}
         placeholder="質問文 / 選択肢で絞り込み"
-        class="w-full pl-9 pr-3 py-2 rounded-lg bg-black/30 ring-1 ring-white/15 focus:ring-purple-400 outline-none text-sm"
+        class="ui-input w-full pl-9 pr-3 py-2 rounded-lg outline-none text-sm"
       />
-      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-hidden="true">🔍</span>
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 ui-text-dim text-sm" aria-hidden="true">🔍</span>
     </div>
     {#if query && filtered.length === 0}
-      <p class="text-sm text-slate-400">該当するカードがありません</p>
+      <p class="text-sm ui-text-dim">該当するカードがありません</p>
     {:else if query}
-      <p class="text-xs text-slate-400">{filtered.length} 件 / 全 {judges.length} 件</p>
+      <p class="text-xs ui-text-dim">{filtered.length} 件 / 全 {judges.length} 件</p>
     {/if}
   </div>
 
@@ -51,14 +51,14 @@
       <button
         type="button"
         onclick={() => (selectedId = j.id)}
-        class="text-left rounded-lg p-4 transition ring-1 {selectedId === j.id
-          ? 'bg-purple-500/30 ring-purple-400 shadow-lg shadow-purple-500/20'
-          : 'bg-white/5 ring-white/15 hover:bg-white/10'}"
+        class="ui-select-card text-left rounded-lg p-4 transition {selectedId === j.id
+          ? 'ui-select-card-active'
+          : ''}"
       >
-        <p class="text-base font-bold text-white">{j.question}</p>
+        <p class="text-base font-bold ui-text-main">{j.question}</p>
         <div class="mt-2 flex flex-wrap gap-1.5">
           {#each j.options as opt}
-            <span class="text-xs px-2 py-0.5 rounded-full bg-black/30 text-slate-300 ring-1 ring-white/10">{opt}</span>
+            <span class="ui-pill text-xs px-2 py-0.5 rounded-full">{opt}</span>
           {/each}
         </div>
       </button>
@@ -69,8 +69,8 @@
     onclick={confirm}
     disabled={!selectedId}
     class="w-full px-5 py-3 rounded-lg font-bold transition {selectedId
-      ? 'bg-purple-500 hover:bg-purple-400 text-white shadow-lg shadow-purple-500/30 active:scale-[0.98]'
-      : 'bg-white/5 text-slate-500 cursor-not-allowed'}"
+      ? 'ui-button-primary active:scale-[0.98]'
+      : 'ui-button-disabled'}"
   >
     決定
   </button>

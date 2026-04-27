@@ -9,7 +9,7 @@
  *   - score_round の採点アルゴリズム
  *   - フェーズ遷移
  */
-import { Phase, DEFAULT_TIMER_SECONDS } from '../types'
+import { Phase, DEFAULT_TIMER_SECONDS, DEFAULT_THEME_ID } from '../types'
 import type { JudgeCard, Player, RoundState, ScorerConfig, IdMap } from '../types'
 import { CountdownTimer } from './timer.svelte'
 
@@ -51,7 +51,11 @@ export class ScoreSession {
   // Svelte 5: class フィールドを reactive にするには `$state` rune を使う。
   // .svelte.ts 拡張子のおかげで Svelte コンパイラが処理してくれる。
   phase: Phase = $state(Phase.Setup)
-  config: ScorerConfig = $state({ totalRounds: null, timerSeconds: DEFAULT_TIMER_SECONDS })
+  config: ScorerConfig = $state({
+    totalRounds: null,
+    timerSeconds: DEFAULT_TIMER_SECONDS,
+    themeId: DEFAULT_THEME_ID,
+  })
   players: Player[] = $state([])
   roundIndex: number = $state(0)
   roundState: RoundState | null = $state(null)
@@ -73,6 +77,7 @@ export class ScoreSession {
     this.config = {
       totalRounds: config.totalRounds ?? names.length,
       timerSeconds: Math.max(0, config.timerSeconds ?? DEFAULT_TIMER_SECONDS),
+      themeId: config.themeId ?? DEFAULT_THEME_ID,
     }
     this.players = names.map((name, id) => ({ id, name, score: 0 }))
     this.roundIndex = 0

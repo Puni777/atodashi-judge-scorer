@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 企画書
+企画書.txt
+
+# GM icon source files copied to public/GM_icon/
+/GM_icon/

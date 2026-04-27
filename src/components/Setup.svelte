@@ -1,10 +1,22 @@
 <script lang="ts">
-  import { DEFAULT_TIMER_SECONDS } from '../lib/types'
+  import type { ThemeId } from '../lib/types'
+  import { DEFAULT_THEME_ID, DEFAULT_TIMER_SECONDS, THEME_OPTIONS } from '../lib/types'
 
   type Props = {
-    onStart: (names: string[], totalRounds: number | null, timerSeconds: number) => void
+    onStart: (
+      names: string[],
+      totalRounds: number | null,
+      timerSeconds: number,
+      themeId: ThemeId,
+    ) => void
+    selectedThemeId?: ThemeId
+    onThemeChange?: (themeId: ThemeId) => void
   }
-  let { onStart }: Props = $props()
+  let {
+    onStart,
+    selectedThemeId = DEFAULT_THEME_ID,
+    onThemeChange = () => {},
+  }: Props = $props()
 
   let count = $state(3)
   let names = $state<string[]>(['プレイヤー1', 'プレイヤー2', 'プレイヤー3', 'プレイヤー4', 'プレイヤー5', 'プレイヤー6'])
@@ -41,6 +53,10 @@
     count = n
   }
 
+  function setTheme(nextThemeId: ThemeId) {
+    onThemeChange(nextThemeId)
+  }
+
   function submit() {
     const used = names.slice(0, count).map((n) => n.trim())
     if (used.some((n) => !n)) { error = 'プレイヤー名を入力してください'; return }
@@ -58,23 +74,23 @@
       timerSeconds = parsedTimer
     }
     error = ''
-    onStart(used, total, timerSeconds)
+    onStart(used, total, timerSeconds, selectedThemeId)
   }
 </script>
 
-<section class="rounded-xl bg-white/10 backdrop-blur p-6 space-y-5 ring-1 ring-white/20">
+<section class="ui-card p-6 space-y-5">
   <h2 class="text-xl font-bold">セットアップ</h2>
 
   <div class="space-y-2">
-    <p class="text-sm text-slate-300">プレイヤー人数</p>
+    <p class="text-sm ui-text-muted">プレイヤー人数</p>
     <div class="flex gap-2 flex-wrap">
       {#each [2, 3, 4, 5, 6] as n}
         <button
           type="button"
           onclick={() => setCount(n)}
-          class="w-12 h-12 rounded-lg font-bold transition {count === n
-            ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
-            : 'bg-white/5 text-slate-300 ring-1 ring-white/15 hover:bg-white/10'}"
+          class="ui-segment-button w-12 h-12 rounded-lg font-bold transition {count === n
+            ? 'ui-segment-button-active'
+            : ''}"
         >
           {n}
         </button>
@@ -83,13 +99,13 @@
   </div>
 
   <div class="space-y-2">
-    <p class="text-sm text-slate-300">プレイヤー名</p>
+    <p class="text-sm ui-text-muted">プレイヤー名</p>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {#each Array(count) as _, i}
         <input
           type="text"
           bind:value={names[i]}
-          class="px-3 py-2 rounded-lg bg-black/30 ring-1 ring-white/15 focus:ring-purple-400 outline-none"
+          class="ui-input px-3 py-2 rounded-lg outline-none"
           placeholder={`プレイヤー${i + 1}`}
         />
       {/each}
@@ -97,20 +113,20 @@
   </div>
 
   <div class="space-y-2">
-    <p class="text-sm text-slate-300">ラウンド数（空欄で {count}）</p>
+    <p class="text-sm ui-text-muted">ラウンド数（空欄で {count}）</p>
     <input
       type="number"
       min="1"
       bind:value={roundsText}
-      class="w-32 px-3 py-2 rounded-lg bg-black/30 ring-1 ring-white/15 focus:ring-purple-400 outline-none"
+      class="ui-input w-32 px-3 py-2 rounded-lg outline-none"
     />
   </div>
 
   <div class="space-y-2">
     <div class="flex items-center justify-between">
-      <p class="text-sm text-slate-300">最終判断のタイマー</p>
-      <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-        <input type="checkbox" bind:checked={timerEnabled} class="accent-purple-400" />
+      <p class="text-sm ui-text-muted">最終判断のタイマー</p>
+      <label class="flex items-center gap-2 text-xs ui-text-muted cursor-pointer">
+        <input type="checkbox" bind:checked={timerEnabled} class="ui-check" />
         ON
       </label>
     </div>
@@ -119,16 +135,34 @@
       bind:value={timerText}
       disabled={!timerEnabled}
       placeholder="3:00"
-      class="w-32 px-3 py-2 rounded-lg bg-black/30 ring-1 ring-white/15 focus:ring-purple-400 outline-none disabled:opacity-50"
+      class="ui-input w-32 px-3 py-2 rounded-lg outline-none disabled:opacity-50"
     />
-    <p class="text-xs text-slate-400">「3:00」(分:秒) または秒数。OFF にすると無制限。</p>
+    <p class="text-xs ui-text-dim">「3:00」(分:秒) または秒数。OFF にすると無制限。</p>
   </div>
 
-  {#if error}<p class="text-red-300 text-sm">{error}</p>{/if}
+  <div class="space-y-2">
+    <p class="text-sm ui-text-muted">スタイル</p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {#each THEME_OPTIONS as theme}
+        <button
+          type="button"
+          onclick={() => setTheme(theme.id)}
+          class="ui-theme-option rounded-lg px-3 py-3 font-bold transition {selectedThemeId === theme.id
+            ? 'ui-theme-option-active'
+            : ''}"
+        >
+          <span class="theme-swatch" data-preview={theme.id} aria-hidden="true"></span>
+          <span>{theme.name}</span>
+        </button>
+      {/each}
+    </div>
+  </div>
+
+  {#if error}<p class="ui-text-danger text-sm">{error}</p>{/if}
 
   <button
     onclick={submit}
-    class="w-full px-5 py-3 rounded-lg bg-purple-500 hover:bg-purple-400 active:scale-[0.98] transition font-bold shadow-lg shadow-purple-500/30"
+    class="ui-button-primary w-full px-5 py-3 rounded-lg active:scale-[0.98] transition font-bold"
   >
     ゲーム開始
   </button>

@@ -14,33 +14,33 @@
 </script>
 
 {#if timer.totalSeconds > 0}
-  <div class="rounded-xl p-4 ring-1 transition {expired
-    ? 'bg-red-500/30 ring-red-400 animate-pulse'
+  <div class="ui-timer rounded-xl p-4 transition {expired
+    ? 'ui-timer-expired animate-pulse'
     : warn
-      ? 'bg-amber-500/20 ring-amber-400/60'
-      : 'bg-white/5 ring-white/15'}">
+      ? 'ui-timer-warn'
+      : ''}">
     <div class="flex items-baseline justify-between">
-      <p class="text-xs text-slate-300 uppercase tracking-widest">残り時間</p>
+      <p class="text-xs ui-text-muted uppercase tracking-widest">残り時間</p>
       {#if expired}
-        <p class="text-xs font-bold text-red-200">⏰ 時間切れ</p>
+        <p class="text-xs font-bold ui-text-danger">⏰ 時間切れ</p>
       {:else if !timer.isRunning}
-        <p class="text-xs text-slate-400">停止中</p>
+        <p class="text-xs ui-text-dim">停止中</p>
       {/if}
     </div>
     <p class="mt-1 font-mono text-4xl font-bold tabular-nums {expired
-      ? 'text-red-200'
+      ? 'ui-text-danger'
       : warn
-        ? 'text-amber-200'
-        : 'text-white'}">
+        ? 'ui-text-warning'
+        : 'ui-text-main'}">
       {mm}:{String(ss).padStart(2, '0')}
     </p>
-    <div class="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden">
+    <div class="ui-progress-track mt-2 h-1.5 rounded-full overflow-hidden">
       <div
         class="h-full transition-all {expired
-          ? 'bg-red-400'
+          ? 'ui-progress-danger'
           : warn
-            ? 'bg-amber-400'
-            : 'bg-purple-400'}"
+            ? 'ui-progress-warning'
+            : 'ui-progress-accent'}"
         style="width: {Math.max(0, Math.min(100, progress * 100))}%"
       ></div>
     </div>

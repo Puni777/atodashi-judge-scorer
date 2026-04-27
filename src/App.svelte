@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { JudgeCard } from './lib/types'
-  import { Phase } from './lib/types'
+  import type { JudgeCard, ThemeId } from './lib/types'
+  import { DEFAULT_THEME_ID, Phase } from './lib/types'
   import { ScoreSession } from './lib/scorer/session.svelte'
   import { loadJudges } from './lib/scorer/judges'
+  import { fallbackGmMessages, getGmMessage, loadGmMessages } from './lib/scorer/gmMessages'
   import Setup from './components/Setup.svelte'
   import RoundHeader from './components/RoundHeader.svelte'
   import JudgeSelect from './components/JudgeSelect.svelte'
@@ -11,18 +12,27 @@
   import RoundScore from './components/RoundScore.svelte'
   import GameOver from './components/GameOver.svelte'
   import TimerDisplay from './components/TimerDisplay.svelte'
+  import GameMasterGuide from './components/GameMasterGuide.svelte'
 
   let session = new ScoreSession()
   let judges = $state<JudgeCard[]>([])
+  let gmMessages = $state(fallbackGmMessages)
   let loadError = $state('')
   let runError = $state('')
+  let activeThemeId = $state<ThemeId>(DEFAULT_THEME_ID)
 
-  onMount(async () => {
-    try {
-      judges = await loadJudges()
-    } catch (e) {
-      loadError = String(e)
-    }
+  onMount(() => {
+    void loadJudges()
+      .then((cards) => {
+        judges = cards
+      })
+      .catch((e) => {
+        loadError = String(e)
+      })
+
+    void loadGmMessages().then((messages) => {
+      gmMessages = messages
+    })
   })
 
   function safe(action: () => void) {
@@ -34,8 +44,14 @@
     }
   }
 
-  function handleStart(names: string[], totalRounds: number | null, timerSeconds: number) {
-    safe(() => session.startGame(names, { totalRounds, timerSeconds }))
+  function handleStart(
+    names: string[],
+    totalRounds: number | null,
+    timerSeconds: number,
+    themeId: ThemeId,
+  ) {
+    activeThemeId = themeId
+    safe(() => session.startGame(names, { totalRounds, timerSeconds, themeId }))
   }
 
   function handleEnterParentSetup() {
@@ -80,31 +96,40 @@
   function handleRestart() {
     const names = session.players.map((p) => p.name)
     const { totalRounds, timerSeconds } = session.config
-    safe(() => session.startGame(names, { totalRounds, timerSeconds }))
+    const themeId = session.config.themeId ?? DEFAULT_THEME_ID
+    activeThemeId = themeId
+    safe(() => session.startGame(names, { totalRounds, timerSeconds, themeId }))
   }
 
   let totalRounds = $derived(session.config.totalRounds ?? session.players.length)
   let isLastRound = $derived(session.roundIndex + 1 >= totalRounds)
+  let gmMessage = $derived(getGmMessage(gmMessages, session))
 </script>
 
-<main class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 text-white">
+<main class="app-shell" data-theme={activeThemeId}>
   <div class="max-w-2xl mx-auto p-4 sm:p-8 space-y-5">
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">後出しジャッジ Scorer</h1>
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight ui-title">後出しジャッジ Scorer</h1>
 
     {#if loadError}
-      <div class="rounded-lg bg-red-500/20 ring-1 ring-red-400/50 p-4 text-red-200">
+      <div class="ui-alert-danger rounded-lg p-4">
         ジャッジカードの読み込みに失敗しました: {loadError}
       </div>
     {/if}
 
     {#if runError}
-      <div class="rounded-lg bg-amber-500/20 ring-1 ring-amber-400/50 p-3 text-amber-200 text-sm">
+      <div class="ui-alert-warning rounded-lg p-3 text-sm">
         {runError}
       </div>
     {/if}
 
+    <GameMasterGuide message={gmMessage} />
+
     {#if session.phase === Phase.Setup}
-      <Setup onStart={handleStart} />
+      <Setup
+        onStart={handleStart}
+        selectedThemeId={activeThemeId}
+        onThemeChange={(themeId) => (activeThemeId = themeId)}
+      />
     {:else if session.phase === Phase.GameOver}
       <GameOver players={session.players} onRestart={handleRestart} />
     {:else}
@@ -116,13 +141,13 @@
       />
 
       {#if session.phase === Phase.RoundStart}
-        <section class="rounded-xl bg-white/10 backdrop-blur p-6 space-y-4 ring-1 ring-white/20 text-center">
-          <p class="text-sm text-slate-400">このラウンドの親</p>
+        <section class="ui-card p-6 space-y-4 text-center">
+          <p class="text-sm ui-text-dim">このラウンドの親</p>
           <p class="text-3xl font-bold">{session.parent().name}</p>
-          <p class="text-sm text-slate-300">親はジャッジを選んでください</p>
+          <p class="text-sm ui-text-muted">親はジャッジを選んでください</p>
           <button
             onclick={handleEnterParentSetup}
-            class="w-full px-5 py-3 rounded-lg bg-purple-500 hover:bg-purple-400 text-white font-bold shadow-lg shadow-purple-500/30 active:scale-[0.98] transition"
+            class="ui-button-primary w-full px-5 py-3 rounded-lg font-bold active:scale-[0.98] transition"
           >
             ジャッジを選ぶ
           </button>

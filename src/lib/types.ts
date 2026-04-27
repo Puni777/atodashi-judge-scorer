@@ -40,11 +40,24 @@ export type RoundState = {
   scoreDelta: IdMap
 }
 
+export const THEME_OPTIONS = [
+  { id: 'tailwind', name: 'Tailwind' },
+  { id: 'light', name: 'Light' },
+  { id: 'dark', name: 'Dark' },
+  { id: 'cyber', name: 'Cyber' },
+] as const
+
+export type ThemeId = (typeof THEME_OPTIONS)[number]['id']
+
+export const DEFAULT_THEME_ID: ThemeId = 'tailwind'
+
 export type ScorerConfig = {
   /** null → プレイヤー人数（親一巡）で確定 */
   totalRounds: number | null
   /** 最終判断のタイマー秒数。0 = OFF。デフォルトは 180 秒（3 分） */
   timerSeconds: number
+  /** 画面全体の見た目。未指定なら Tailwind default */
+  themeId?: ThemeId
 }
 
 export const DEFAULT_TIMER_SECONDS = 180
