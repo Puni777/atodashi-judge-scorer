@@ -2,25 +2,28 @@ import { Phase } from '../types'
 import type { IdMap } from '../types'
 import type { ScoreSession } from './session.svelte'
 
+/** 1 状態あたりの GM セリフ。1 文でも複数文の配列でも書ける（後方互換）。 */
+export type GmMessageSequence = string | string[]
+
 export type GmJudgmentMessages = {
-  empty: string
-  progress: string
-  complete: string
+  empty: GmMessageSequence
+  progress: GmMessageSequence
+  complete: GmMessageSequence
 }
 
 export type GmFinalJudgmentMessages = GmJudgmentMessages & {
-  expired: string
+  expired: GmMessageSequence
 }
 
 export type GmMessages = {
-  setup: string
-  roundStart: string
-  parentSetup: string
+  setup: GmMessageSequence
+  roundStart: GmMessageSequence
+  parentSetup: GmMessageSequence
   firstJudgment: GmJudgmentMessages
   secondJudgment: GmJudgmentMessages
   finalJudgment: GmFinalJudgmentMessages
-  roundScore: string
-  gameOver: string
+  roundScore: GmMessageSequence
+  gameOver: GmMessageSequence
 }
 
 export type GmMessagesFile = {
@@ -29,27 +32,72 @@ export type GmMessagesFile = {
 }
 
 export const fallbackGmMessages: GmMessages = {
-  setup: 'まずは参加する人を決めましょう。名前とラウンド数、タイマーを確認したら始められます。',
-  roundStart: 'このラウンドの親は {parent} さんです。準備ができたらジャッジを選びましょう。',
-  parentSetup: '親は今回の判断軸になるジャッジカードを1枚選んでください。',
+  setup: [
+    'こんにちは！後出しジャッジへようこそ。',
+    'まずは参加する人と、名前・ラウンド数・タイマーを決めましょう。',
+    '準備ができたら「ゲームスタート」を押してください！',
+  ],
+  roundStart: [
+    'ラウンド {round}/{totalRounds} のはじまりです！',
+    '今回の親は {parent} さんですね。',
+    '親はジャッジカードを選ぶ準備をしましょう。',
+  ],
+  parentSetup: [
+    '{parent} さん、ジャッジカードを選んでください。',
+    '選んだジャッジで、みんなが判断していきます。',
+  ],
   firstJudgment: {
-    empty: 'まずは直感で第1判断です。今ある情報だけで選んでみましょう。',
-    progress: '第1判断は {done}/{total} 人まで入力済みです。全員そろうまで待ちましょう。',
-    complete: '全員の第1判断がそろいました。親は追加情報を出して、次へ進めましょう。',
+    empty: [
+      'テーマは「{judge}」です。',
+      'まずは第1判断！今ある情報だけで、直感で選んでみましょう。',
+      'ここで意見が割れても全然 OK です。',
+    ],
+    progress: '残り {remaining} 人の判断を待っています。',
+    complete: [
+      '全員の第1判断がそろいました！',
+      '次は親の {parent} さんの番。',
+      'アイテムカードを出して、子の判断を揺さぶりましょう。',
+      '親はカードについて何も言わずに出すのがルールです。',
+    ],
   },
   secondJudgment: {
-    empty: '追加情報をふまえて第2判断です。さっきの判断が変わっても大丈夫です。',
-    progress: '第2判断は {done}/{total} 人まで入力済みです。落ち着いて選びましょう。',
-    complete: '第2判断がそろいました。ここから話し合いに入ります。',
+    empty: [
+      '親が情報を追加しました。',
+      'アイテムは「事実」として扱います。',
+      'これをふまえて、第2判断をしましょう。',
+      '判断を変えなくても、変えても OK です。',
+    ],
+    progress: '残り {remaining} 人。落ち着いて選びましょう。',
+    complete: [
+      '第2判断がそろいました。',
+      'ここからは話し合いの時間です！',
+      '子のみんなもアイテムカードを出して反論できますよ。',
+      '自分の判断が正しいことを、理由とアイテムで証明しましょう。',
+    ],
   },
   finalJudgment: {
-    empty: '話し合いの結論として、最終判断を選んでください。',
-    progress: '最終判断は {done}/{total} 人まで入力済みです。納得できる選択をしましょう。',
-    complete: '全員の最終判断がそろいました。採点に進めます。',
-    expired: '時間です。まだ未入力の人がいれば、最終判断を入れてから採点しましょう。',
+    empty: [
+      '話し合いをふまえて、最終判断を選んでください。',
+      '親は、第2判断から最終判断で意見を変えた子の人数分が得点。',
+      '子は、自分と同じ最終判断に他の子を引き込んだ人数分が得点。',
+      'ただし、第2判断から最終判断で自分が意見を変えた場合、子は得点になりません。',
+    ],
+    progress: '残り {remaining} 人。納得できる選択を！',
+    complete: '全員の最終判断がそろいました。採点に進みましょう！',
+    expired: [
+      '時間切れです！',
+      '未入力の人がいたら最終判断を入れてから採点しましょう。',
+    ],
   },
-  roundScore: 'このラウンドの結果です。判断がどう動いたかを見て、次へ進みましょう。',
-  gameOver: 'ゲーム終了です。順位だけでなく、判断が揺れた場面もぜひ振り返ってみてください。',
+  roundScore: [
+    'このラウンドの結果です。',
+    '判断がどう動いたかを見て、次のラウンドへ進みましょう。',
+  ],
+  gameOver: [
+    'ゲーム終了です！お疲れさまでした。',
+    '順位だけでなく、判断が揺れた場面もぜひ振り返ってみてください。',
+    'もう一試合いきますか？',
+  ],
 }
 
 type TemplateValue = string | number
@@ -62,29 +110,34 @@ export function renderGmTemplate(template: string, values: TemplateValues): stri
   })
 }
 
-export function getGmMessage(messages: GmMessages, session: ScoreSession): string {
+function renderSequence(sequence: GmMessageSequence, values: TemplateValues): string[] {
+  const arr = Array.isArray(sequence) ? sequence : [sequence]
+  return arr.map((line) => renderGmTemplate(line, values))
+}
+
+export function getGmMessage(messages: GmMessages, session: ScoreSession): string[] {
   const values = baseTemplateValues(session)
 
   switch (session.phase) {
     case Phase.Setup:
-      return renderGmTemplate(messages.setup, values)
+      return renderSequence(messages.setup, values)
     case Phase.RoundStart:
-      return renderGmTemplate(messages.roundStart, values)
+      return renderSequence(messages.roundStart, values)
     case Phase.ParentSetup:
-      return renderGmTemplate(messages.parentSetup, values)
+      return renderSequence(messages.parentSetup, values)
     case Phase.FirstJudgment:
       return judgmentMessage(messages.firstJudgment, session.roundState?.firstJudgments, values)
     case Phase.SecondJudgment:
       return judgmentMessage(messages.secondJudgment, session.roundState?.secondJudgments, values)
     case Phase.FinalJudgment:
       if (session.timer.expired) {
-        return renderGmTemplate(messages.finalJudgment.expired, values)
+        return renderSequence(messages.finalJudgment.expired, values)
       }
       return judgmentMessage(messages.finalJudgment, session.roundState?.finalJudgments, values)
     case Phase.RoundScore:
-      return renderGmTemplate(messages.roundScore, values)
+      return renderSequence(messages.roundScore, values)
     case Phase.GameOver:
-      return renderGmTemplate(messages.gameOver, values)
+      return renderSequence(messages.gameOver, values)
   }
 }
 
@@ -109,30 +162,37 @@ export function parseGmMessagesFile(value: unknown): GmMessages | null {
   const messages = asRecord(root.messages)
   if (!messages) return null
 
+  const setup = asMessageSequence(messages.setup)
+  const roundStart = asMessageSequence(messages.roundStart)
+  const parentSetup = asMessageSequence(messages.parentSetup)
+  const roundScore = asMessageSequence(messages.roundScore)
+  const gameOver = asMessageSequence(messages.gameOver)
   const firstJudgment = parseJudgmentMessages(messages.firstJudgment)
   const secondJudgment = parseJudgmentMessages(messages.secondJudgment)
   const finalJudgment = parseFinalJudgmentMessages(messages.finalJudgment)
-  if (!firstJudgment || !secondJudgment || !finalJudgment) return null
 
   if (
-    typeof messages.setup !== 'string' ||
-    typeof messages.roundStart !== 'string' ||
-    typeof messages.parentSetup !== 'string' ||
-    typeof messages.roundScore !== 'string' ||
-    typeof messages.gameOver !== 'string'
+    setup === null ||
+    roundStart === null ||
+    parentSetup === null ||
+    roundScore === null ||
+    gameOver === null ||
+    !firstJudgment ||
+    !secondJudgment ||
+    !finalJudgment
   ) {
     return null
   }
 
   return {
-    setup: messages.setup,
-    roundStart: messages.roundStart,
-    parentSetup: messages.parentSetup,
+    setup,
+    roundStart,
+    parentSetup,
     firstJudgment,
     secondJudgment,
     finalJudgment,
-    roundScore: messages.roundScore,
-    gameOver: messages.gameOver,
+    roundScore,
+    gameOver,
   }
 }
 
@@ -140,11 +200,12 @@ function judgmentMessage(
   messages: GmJudgmentMessages,
   judgments: IdMap | undefined,
   values: TemplateValues,
-): string {
+): string[] {
   const done = judgments ? Object.keys(judgments).length : 0
   const total = Number(values.total)
+  const remaining = Math.max(0, total - done)
   const key = progressKey(done, total)
-  return renderGmTemplate(messages[key], { ...values, done, total })
+  return renderSequence(messages[key], { ...values, done, total, remaining })
 }
 
 function progressKey(done: number, total: number): keyof GmJudgmentMessages {
@@ -158,6 +219,7 @@ function baseTemplateValues(session: ScoreSession): TemplateValues {
   const total = safeChildrenCount(session)
   return {
     parent: safeParentName(session),
+    judge: safeJudgeQuestion(session),
     round: session.currentRoundNumber(),
     total,
     totalRounds,
@@ -180,24 +242,35 @@ function safeChildrenCount(session: ScoreSession): number {
   }
 }
 
+function safeJudgeQuestion(session: ScoreSession): string {
+  return session.roundState?.judge?.question ?? 'ジャッジ'
+}
+
+function asMessageSequence(value: unknown): GmMessageSequence | null {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
+    return value as string[]
+  }
+  return null
+}
+
 function parseJudgmentMessages(value: unknown): GmJudgmentMessages | null {
   const obj = asRecord(value)
   if (!obj) return null
-  if (
-    typeof obj.empty !== 'string' ||
-    typeof obj.progress !== 'string' ||
-    typeof obj.complete !== 'string'
-  ) {
-    return null
-  }
-  return { empty: obj.empty, progress: obj.progress, complete: obj.complete }
+  const empty = asMessageSequence(obj.empty)
+  const progress = asMessageSequence(obj.progress)
+  const complete = asMessageSequence(obj.complete)
+  if (empty === null || progress === null || complete === null) return null
+  return { empty, progress, complete }
 }
 
 function parseFinalJudgmentMessages(value: unknown): GmFinalJudgmentMessages | null {
   const base = parseJudgmentMessages(value)
   const obj = asRecord(value)
-  if (!base || !obj || typeof obj.expired !== 'string') return null
-  return { ...base, expired: obj.expired }
+  if (!base || !obj) return null
+  const expired = asMessageSequence(obj.expired)
+  if (expired === null) return null
+  return { ...base, expired }
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

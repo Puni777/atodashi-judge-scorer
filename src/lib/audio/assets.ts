@@ -29,7 +29,7 @@ export const fallbackAudioAssets: AudioAssets = {
     confirm: {
       label: '決定ボタンを押す',
       src: 'audio/se/confirm-button.mp3',
-      volume: 0.65,
+      volume: 0.4,
     },
     roundScore: {
       label: 'スコア表示',

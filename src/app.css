@@ -705,7 +705,7 @@ button, input {
 }
 
 .app-shell-floating-gm {
-  padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(8.5rem + env(safe-area-inset-bottom));
 }
 
 .gm-guide-floating {
@@ -723,6 +723,8 @@ button, input {
 }
 
 .gm-guide-floating .gm-bubble {
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
   width: min(18rem, calc(100vw - 6.5rem));
 }
 
@@ -805,9 +807,12 @@ button, input {
   font-weight: 700;
   line-height: 1.7;
   margin: 0;
-  min-height: 3.2rem;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.gm-message + .gm-message {
+  margin-top: 0.4rem;
 }
 
 .gm-cursor {
@@ -860,7 +865,7 @@ button, input {
 
 @media (max-width: 640px) {
   .app-shell-floating-gm {
-    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
   }
 
   .gm-guide-floating {
@@ -883,7 +888,6 @@ button, input {
 
   .gm-guide-floating .gm-message {
     font-size: 0.85rem;
-    min-height: 2.9rem;
   }
 
   .gm-guide-floating .gm-label {
@@ -930,7 +934,6 @@ button, input {
 
   .gm-message {
     font-size: 0.88rem;
-    min-height: 3rem;
   }
 }
 

@@ -25,6 +25,7 @@ dist-ssr
 
 # 企画書
 企画書.txt
+/企画書
 
 # GM icon source files copied to public/GM_icon/
 /GM_icon/

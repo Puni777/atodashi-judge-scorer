@@ -14,6 +14,7 @@ export class AudioManager {
   private unlocked = false
   private mainBgmStarted = false
   private seReady = false
+  private hasFailure = false
   private pendingBgmAutoplay = false
   private sePrimePromise: Promise<void> | null = null
   private status: AudioLoadStatus = 'loading'
@@ -44,6 +45,8 @@ export class AudioManager {
     this.assets = assets
     this.mainBgmStarted = false
     this.seReady = false
+    this.hasFailure = false
+    this.refreshStatus()
     this.rebuild()
     this.primeAudioElements()
     void this.primeSeBuffers()
@@ -59,15 +62,16 @@ export class AudioManager {
     void this.playBgm('main')
   }
 
-  unlock(): void {
+  async unlock(): Promise<void> {
     if (this.unlocked) return
     this.ensureAudioContext()
     this.connectBgmNodes()
-    void this.resumeAudioContext()
+    await this.resumeAudioContext()
     this.primeAudioElements()
     void this.primeSeBuffers()
-    this.unlocked = true
-    this.startAutoplay()
+    this.unlocked = this.audioContext?.state === 'running' || !this.audioContext
+    this.refreshStatus()
+    if (this.unlocked) this.startAutoplay()
   }
 
   playSe(id: SoundEffectId): void {
@@ -110,7 +114,10 @@ export class AudioManager {
 
   resumeMainBgmAfterGesture(): void {
     if (!this.bgmEnabled) return
-    if (!this.unlocked) this.unlock()
+    if (!this.unlocked) {
+      void this.unlock()
+      return
+    }
     void this.resumeAudioContext()
     if (this.mainBgmStarted || !this.assets.bgm.main.autoplay) return
     this.startAutoplay()
@@ -210,8 +217,8 @@ export class AudioManager {
     )
       .then((results) => {
         this.seReady = true
-        const hasFailure = results.some((result) => result.status === 'rejected')
-        this.setStatus(hasFailure ? 'error' : 'ready')
+        this.hasFailure = results.some((result) => result.status === 'rejected')
+        this.refreshStatus()
         if (this.pendingBgmAutoplay) {
           this.pendingBgmAutoplay = false
           this.startAutoplay()
@@ -255,6 +262,10 @@ export class AudioManager {
       window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AudioContextCtor) return null
     this.audioContext = new AudioContextCtor()
+    this.audioContext.addEventListener('statechange', () => {
+      if (this.audioContext?.state === 'running') this.unlocked = true
+      this.refreshStatus()
+    })
     this.connectBgmNodes()
     return this.audioContext
   }
@@ -338,6 +349,17 @@ export class AudioManager {
     if (this.status === status) return
     this.status = status
     for (const listener of this.statusListeners) listener(status)
+  }
+
+  private refreshStatus(): void {
+    this.setStatus(this.computeStatus())
+  }
+
+  private computeStatus(): AudioLoadStatus {
+    if (this.hasFailure) return 'error'
+    if (!this.seReady) return 'loading'
+    if (this.audioContext && this.audioContext.state !== 'running') return 'loading'
+    return 'ready'
   }
 }
 

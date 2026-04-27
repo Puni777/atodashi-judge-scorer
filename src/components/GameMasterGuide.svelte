@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
 
   type Props = {
-    message: string
+    message: string[] | string
     mode?: 'inline' | 'floating'
     collapsed?: boolean
     onCollapsedChange?: (collapsed: boolean) => void
@@ -60,7 +60,7 @@
   })
 
   $effect(() => {
-    startTyping(message)
+    startTyping(messageToText(message))
     return clearTimers
   })
 
@@ -104,7 +104,7 @@
     const char = chars[index] ?? ''
     typedText += char
     displayed = typedText
-    const delay = /[、。！？!?]/.test(char) ? 120 : 22
+    const delay = /[、。！？!?\n]/.test(char) ? 120 : 22
     typeTimer = window.setTimeout(() => typeNext(currentRun, chars, index + 1), delay)
   }
 
@@ -172,6 +172,13 @@
     resetMenuOpen = false
     onRequestReset()
   }
+
+  function messageToText(value: string[] | string): string {
+    return Array.isArray(value) ? value.filter((line) => line.length > 0).join('\n') : value
+  }
+
+  let ariaText = $derived(messageToText(message))
+  let displayedLines = $derived(displayed.split('\n'))
 </script>
 
 <section
@@ -179,7 +186,7 @@
   class="gm-guide"
   class:gm-guide-floating={mode === 'floating'}
   class:gm-guide-collapsed={mode === 'floating' && collapsed}
-  aria-label={`Game Master: ${message}`}
+  aria-label={`Game Master: ${ariaText}`}
 >
   {#if mode === 'floating'}
     <button
@@ -208,8 +215,10 @@
   <div class="gm-bubble" hidden={mode === 'floating' && collapsed}>
     <p class="gm-label">Game Master</p>
     <p class="gm-message" aria-hidden="true">
-      {displayed}<span class="gm-cursor" class:gm-cursor-hidden={!isTyping}>▍</span>
+      {#each displayedLines as line, index}
+        {line}{#if index < displayedLines.length - 1}<br />{/if}
+      {/each}<span class="gm-cursor" class:gm-cursor-hidden={!isTyping}>▍</span>
     </p>
-    <p class="sr-only">{message}</p>
+    <p class="sr-only">{ariaText}</p>
   </div>
 </section>
