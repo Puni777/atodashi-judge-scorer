@@ -34,9 +34,11 @@ function start(
 }
 
 describe('ScoreSession', () => {
-  it('プレイヤー人数 1 / 7 はエラー', () => {
-    expect(() => start(new ScoreSession(), ['A'])).toThrow()
-    expect(() => start(new ScoreSession(), ['A', 'B', 'C', 'D', 'E', 'F', 'G'])).toThrow()
+  it('プレイヤー人数 2 / 9 はエラー、3 / 8 は有効', () => {
+    expect(() => start(new ScoreSession(), ['A', 'B'])).toThrow()
+    expect(() => start(new ScoreSession(), ['A', 'B', 'C'])).not.toThrow()
+    expect(() => start(new ScoreSession(), ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])).not.toThrow()
+    expect(() => start(new ScoreSession(), ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'])).toThrow()
   })
 
   it('初期 phase は Setup', () => {
@@ -167,6 +169,14 @@ describe('ScoreSession', () => {
     const cyber = new ScoreSession()
     start(cyber, ['A', 'B', 'C'], { totalRounds: null, timerSeconds: 0, themeId: 'cyber' })
     expect(cyber.config.themeId).toBe('cyber')
+
+    const pink = new ScoreSession()
+    start(pink, ['A', 'B', 'C'], { totalRounds: null, timerSeconds: 0, themeId: 'pink' })
+    expect(pink.config.themeId).toBe('pink')
+
+    const orange = new ScoreSession()
+    start(orange, ['A', 'B', 'C'], { totalRounds: null, timerSeconds: 0, themeId: 'orange' })
+    expect(orange.config.themeId).toBe('orange')
   })
 
   it('timerSeconds 設定なし（0）ならタイマーは start されない', () => {

@@ -9,15 +9,22 @@
 
   let selectedId = $state<string | null>(null)
   let query = $state('')
+  let hasQuery = $derived(query.trim().length > 0)
 
   let filtered = $derived.by(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return judges
+    if (!q) return []
     return judges.filter((j) =>
       j.id.toLowerCase().includes(q) ||
       j.question.toLowerCase().includes(q) ||
       j.options.some((opt) => opt.toLowerCase().includes(q)),
     )
+  })
+
+  $effect(() => {
+    if (selectedId && !filtered.some((j) => j.id === selectedId)) {
+      selectedId = null
+    }
   })
 
   function confirm() {
@@ -39,9 +46,11 @@
       />
       <span class="absolute left-3 top-1/2 -translate-y-1/2 ui-text-dim text-sm" aria-hidden="true">🔍</span>
     </div>
-    {#if query && filtered.length === 0}
+    {#if !hasQuery}
+      <p class="text-sm ui-text-dim">検索すると候補が表示されます。</p>
+    {:else if filtered.length === 0}
       <p class="text-sm ui-text-dim">該当するカードがありません</p>
-    {:else if query}
+    {:else}
       <p class="text-xs ui-text-dim">{filtered.length} 件 / 全 {judges.length} 件</p>
     {/if}
   </div>

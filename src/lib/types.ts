@@ -45,6 +45,8 @@ export const THEME_OPTIONS = [
   { id: 'light', name: 'Light' },
   { id: 'dark', name: 'Dark' },
   { id: 'cyber', name: 'Cyber' },
+  { id: 'pink', name: 'Pink' },
+  { id: 'orange', name: 'Orange' },
 ] as const
 
 export type ThemeId = (typeof THEME_OPTIONS)[number]['id']

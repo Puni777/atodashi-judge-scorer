@@ -7,6 +7,7 @@
   import { loadJudges } from './lib/scorer/judges'
   import { fallbackGmMessages, getGmMessage, loadGmMessages } from './lib/scorer/gmMessages'
   import { AudioManager } from './lib/audio/audioManager'
+  import type { AudioLoadStatus } from './lib/audio/audioManager'
   import { fallbackAudioAssets, loadAudioAssets } from './lib/audio/assets'
   import Setup from './components/Setup.svelte'
   import RoundHeader from './components/RoundHeader.svelte'
@@ -28,6 +29,8 @@
     floatingGmCollapsed: boolean
     seEnabled: boolean
     bgmEnabled: boolean
+    seVolume: number
+    bgmVolume: number
   }
 
   let session = new ScoreSession()
@@ -40,17 +43,22 @@
   let floatingGmCollapsed = $state(false)
   let seEnabled = $state(true)
   let bgmEnabled = $state(true)
+  let seVolume = $state(1)
+  let bgmVolume = $state(0.5)
   let pendingResume = $state<ScoreSessionSnapshot | null>(null)
   let storageReady = $state(false)
   let sessionPersistenceEnabled = $state(false)
   let inlineGmHost: HTMLElement | null = null
   let inlineGmVisible = $state(true)
   let audioManager: AudioManager | null = null
+  let audioStatus = $state<AudioLoadStatus>('loading')
   let previousAudioPhase: Phase = Phase.Setup
+  let alarmPlayedForCurrentFinal = false
 
   onMount(() => {
     let gmObserver: IntersectionObserver | null = null
     let unsubscribeAlarm: (() => void) | null = null
+    let unsubscribeAudioStatus: (() => void) | null = null
 
     const uiSettings = readUiSettings()
     if (uiSettings) {
@@ -59,6 +67,8 @@
       floatingGmCollapsed = false
       seEnabled = uiSettings.seEnabled
       bgmEnabled = uiSettings.bgmEnabled
+      seVolume = uiSettings.seVolume
+      bgmVolume = uiSettings.bgmVolume
     }
 
     const storedSession = readStoredSession()
@@ -93,15 +103,20 @@
     }
 
     audioManager = new AudioManager(fallbackAudioAssets)
+    unsubscribeAudioStatus = audioManager.onStatusChange((status) => {
+      audioStatus = status
+    })
     audioManager.setSeEnabled(seEnabled)
     audioManager.setBgmEnabled(bgmEnabled)
+    audioManager.setSeVolume(seVolume)
+    audioManager.setBgmVolume(bgmVolume)
     audioManager.startAutoplay()
-    unsubscribeAlarm = session.timer.on('expired', () => audioManager?.playSe('alarm'))
+    unsubscribeAlarm = session.timer.on('expired', () => playAlarmOnce())
 
     const onPointerDown = (event: PointerEvent) => {
-      audioManager?.resumeMainBgmAfterGesture()
       const sound = interactiveTapSound(event.target)
       if (sound) audioManager?.playSe(sound)
+      audioManager?.resumeMainBgmAfterGesture()
     }
     document.addEventListener('pointerdown', onPointerDown)
 
@@ -113,6 +128,7 @@
     return () => {
       gmObserver?.disconnect()
       unsubscribeAlarm?.()
+      unsubscribeAudioStatus?.()
       document.removeEventListener('pointerdown', onPointerDown)
       audioManager?.stopBgm('main')
       audioManager = null
@@ -128,12 +144,16 @@
       floatingGmCollapsed,
       seEnabled,
       bgmEnabled,
+      seVolume,
+      bgmVolume,
     })
   })
 
   $effect(() => {
     audioManager?.setSeEnabled(seEnabled)
     audioManager?.setBgmEnabled(bgmEnabled)
+    audioManager?.setSeVolume(seVolume)
+    audioManager?.setBgmVolume(bgmVolume)
   })
 
   $effect(() => {
@@ -153,6 +173,17 @@
       audioManager?.playSe('roundScore')
     } else if (phase === Phase.GameOver) {
       audioManager?.playSe('finalScore')
+    }
+    if (phase === Phase.FinalJudgment) {
+      alarmPlayedForCurrentFinal = false
+    } else {
+      alarmPlayedForCurrentFinal = true
+    }
+  })
+
+  $effect(() => {
+    if (session.phase === Phase.FinalJudgment && session.timer.expired) {
+      playAlarmOnce()
     }
   })
 
@@ -258,6 +289,14 @@
     bgmEnabled = enabled
   }
 
+  function handleSeVolumeChange(volume: number) {
+    seVolume = volume
+  }
+
+  function handleBgmVolumeChange(volume: number) {
+    bgmVolume = volume
+  }
+
   function handleResetToSetupWithConfirm() {
     const ok = window.confirm(
       'ゲームを初期化してセットアップ画面に戻りますか？現在の進行状況は削除されます。',
@@ -334,11 +373,23 @@
       floatingGmCollapsed: obj.floatingGmCollapsed,
       seEnabled: typeof obj.seEnabled === 'boolean' ? obj.seEnabled : true,
       bgmEnabled: typeof obj.bgmEnabled === 'boolean' ? obj.bgmEnabled : true,
+      seVolume: typeof obj.seVolume === 'number' ? clampUnit(obj.seVolume) : 1,
+      bgmVolume: typeof obj.bgmVolume === 'number' ? clampUnit(obj.bgmVolume) : 0.5,
     }
   }
 
   function isThemeId(value: unknown): value is ThemeId {
     return typeof value === 'string' && THEME_OPTIONS.some((theme) => theme.id === value)
+  }
+
+  function clampUnit(value: number): number {
+    return Math.max(0, Math.min(1, value))
+  }
+
+  function playAlarmOnce() {
+    if (alarmPlayedForCurrentFinal) return
+    alarmPlayedForCurrentFinal = true
+    audioManager?.playSe('alarm')
   }
 
   function interactiveTapSound(target: EventTarget | null): 'tap' | 'confirm' | null {
@@ -418,8 +469,13 @@
           onFloatingGmChange={handleFloatingGmChange}
           {seEnabled}
           {bgmEnabled}
+          {seVolume}
+          {bgmVolume}
+          {audioStatus}
           onSeEnabledChange={handleSeEnabledChange}
           onBgmEnabledChange={handleBgmEnabledChange}
+          onSeVolumeChange={handleSeVolumeChange}
+          onBgmVolumeChange={handleBgmVolumeChange}
         />
       {/if}
     {:else if session.phase === Phase.GameOver}

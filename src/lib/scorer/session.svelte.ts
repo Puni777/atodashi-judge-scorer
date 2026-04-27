@@ -9,13 +9,13 @@
  *   - score_round の採点アルゴリズム
  *   - フェーズ遷移
  */
-import { Phase, DEFAULT_TIMER_SECONDS, DEFAULT_THEME_ID } from '../types'
+import { Phase, DEFAULT_TIMER_SECONDS, DEFAULT_THEME_ID, THEME_OPTIONS } from '../types'
 import type { JudgeCard, Player, RoundState, ScorerConfig, IdMap } from '../types'
 import { CountdownTimer } from './timer.svelte'
 import type { CountdownTimerSnapshot } from './timer.svelte'
 
-const MIN_PLAYERS = 2
-const MAX_PLAYERS = 6
+const MIN_PLAYERS = 3
+const MAX_PLAYERS = 8
 export const SCORE_SESSION_SNAPSHOT_VERSION = 1
 
 export type RankedPlayer = { rank: number; player: Player }
@@ -417,7 +417,7 @@ function parseConfig(value: unknown): ScorerConfig | null {
         : undefined
   if (totalRounds === undefined || typeof obj.timerSeconds !== 'number') return null
   const themeId =
-    typeof obj.themeId === 'string' && ['tailwind', 'light', 'dark', 'cyber'].includes(obj.themeId)
+    typeof obj.themeId === 'string' && THEME_OPTIONS.some((theme) => theme.id === obj.themeId)
       ? (obj.themeId as ScorerConfig['themeId'])
       : DEFAULT_THEME_ID
   return {
