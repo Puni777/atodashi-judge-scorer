@@ -10,6 +10,7 @@
   import JudgmentPhase from './components/JudgmentPhase.svelte'
   import RoundScore from './components/RoundScore.svelte'
   import GameOver from './components/GameOver.svelte'
+  import TimerDisplay from './components/TimerDisplay.svelte'
 
   let session = new ScoreSession()
   let judges = $state<JudgeCard[]>([])
@@ -33,8 +34,8 @@
     }
   }
 
-  function handleStart(names: string[], totalRounds: number | null) {
-    safe(() => session.startGame(names, { totalRounds }))
+  function handleStart(names: string[], totalRounds: number | null, timerSeconds: number) {
+    safe(() => session.startGame(names, { totalRounds, timerSeconds }))
   }
 
   function handleEnterParentSetup() {
@@ -78,8 +79,8 @@
 
   function handleRestart() {
     const names = session.players.map((p) => p.name)
-    const totalRounds = session.config.totalRounds
-    safe(() => session.startGame(names, { totalRounds }))
+    const { totalRounds, timerSeconds } = session.config
+    safe(() => session.startGame(names, { totalRounds, timerSeconds }))
   }
 
   let totalRounds = $derived(session.config.totalRounds ?? session.players.length)
@@ -105,7 +106,7 @@
     {#if session.phase === Phase.Setup}
       <Setup onStart={handleStart} />
     {:else if session.phase === Phase.GameOver}
-      <GameOver standings={session.standings()} onRestart={handleRestart} />
+      <GameOver players={session.players} onRestart={handleRestart} />
     {:else}
       <RoundHeader
         roundNumber={session.currentRoundNumber()}
@@ -152,6 +153,7 @@
           onAdvance={handleAdvanceToFinal}
         />
       {:else if session.phase === Phase.FinalJudgment && session.roundState?.judge}
+        <TimerDisplay timer={session.timer} />
         <JudgmentPhase
           phaseLabel="最終判断"
           judge={session.roundState.judge}

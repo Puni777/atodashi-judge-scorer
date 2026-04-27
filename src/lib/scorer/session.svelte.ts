@@ -9,11 +9,32 @@
  *   - score_round の採点アルゴリズム
  *   - フェーズ遷移
  */
-import { Phase } from '../types'
+import { Phase, DEFAULT_TIMER_SECONDS } from '../types'
 import type { JudgeCard, Player, RoundState, ScorerConfig, IdMap } from '../types'
+import { CountdownTimer } from './timer.svelte'
 
 const MIN_PLAYERS = 2
 const MAX_PLAYERS = 6
+
+export type RankedPlayer = { rank: number; player: Player }
+
+/**
+ * スコア降順で並べ、同点なら同じ順位を割り当てる（standard competition ranking: 1, 1, 3）。
+ */
+export function rankedStandings(players: Player[]): RankedPlayer[] {
+  const sorted = [...players].sort((a, b) => b.score - a.score)
+  const result: RankedPlayer[] = []
+  let lastScore = Number.POSITIVE_INFINITY
+  let lastRank = 0
+  sorted.forEach((p, i) => {
+    if (p.score < lastScore) {
+      lastRank = i + 1
+      lastScore = p.score
+    }
+    result.push({ rank: lastRank, player: p })
+  })
+  return result
+}
 
 function emptyRoundState(parentId: number): RoundState {
   return {
@@ -30,11 +51,18 @@ export class ScoreSession {
   // Svelte 5: class フィールドを reactive にするには `$state` rune を使う。
   // .svelte.ts 拡張子のおかげで Svelte コンパイラが処理してくれる。
   phase: Phase = $state(Phase.Setup)
-  config: ScorerConfig = $state({ totalRounds: null })
+  config: ScorerConfig = $state({ totalRounds: null, timerSeconds: DEFAULT_TIMER_SECONDS })
   players: Player[] = $state([])
   roundIndex: number = $state(0)
   roundState: RoundState | null = $state(null)
   history: RoundState[] = $state([])
+
+  /** 最終判断のタイマー。session 経由で UI から `session.timer.remainingSeconds` を見る */
+  readonly timer: CountdownTimer
+
+  constructor(timer: CountdownTimer = new CountdownTimer()) {
+    this.timer = timer
+  }
 
   // ---- セットアップ ------------------------------------------------------
 
@@ -44,10 +72,12 @@ export class ScoreSession {
     }
     this.config = {
       totalRounds: config.totalRounds ?? names.length,
+      timerSeconds: Math.max(0, config.timerSeconds ?? DEFAULT_TIMER_SECONDS),
     }
     this.players = names.map((name, id) => ({ id, name, score: 0 }))
     this.roundIndex = 0
     this.history = []
+    this.timer.reset()
     this.beginRound()
   }
 
@@ -108,6 +138,9 @@ export class ScoreSession {
   advanceToFinal(): void {
     if (!this.allSecondSubmitted()) throw new Error('全員の第二判断が未入力です')
     this.phase = Phase.FinalJudgment
+    if (this.config.timerSeconds > 0) {
+      this.timer.start(this.config.timerSeconds)
+    }
   }
 
   finalizeRound(): IdMap {
@@ -115,6 +148,7 @@ export class ScoreSession {
     if (!this.allFinalSubmitted()) throw new Error('全員の最終判断が未入力です')
     const deltas = this.scoreRound(this.roundState!)
     this.phase = Phase.RoundScore
+    this.timer.stop()
     return deltas
   }
 
@@ -122,6 +156,7 @@ export class ScoreSession {
     this.requireRound()
     this.history.push(this.roundState!)
     this.roundIndex += 1
+    this.timer.reset()
     const total = this.config.totalRounds ?? this.players.length
     if (this.roundIndex >= total) {
       this.phase = Phase.GameOver

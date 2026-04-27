@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { Phase } from '../types'
 import type { JudgeCard, ScorerConfig } from '../types'
-import { ScoreSession } from './session.svelte'
+import { ScoreSession, rankedStandings } from './session.svelte'
 
 const JUDGE_2OPT: JudgeCard = {
   id: 'jdg_001',
@@ -22,7 +22,7 @@ const JUDGE_3OPT: JudgeCard = {
 function start(
   s: ScoreSession,
   names: string[] = ['A', 'B', 'C'],
-  config: ScorerConfig = { totalRounds: null },
+  config: ScorerConfig = { totalRounds: null, timerSeconds: 0 },
 ): void {
   s.startGame(names, config)
 }
@@ -107,7 +107,7 @@ describe('ScoreSession', () => {
 
   it('親が A→B→C と正しくローテし、3 ラウンドで GameOver', () => {
     const s = new ScoreSession()
-    start(s, ['A', 'B', 'C'], { totalRounds: 3 })
+    start(s, ['A', 'B', 'C'], { totalRounds: 3, timerSeconds: 0 })
     const parents: string[] = []
     for (let i = 0; i < 3; i++) {
       parents.push(s.parent().name)
@@ -153,6 +153,39 @@ describe('ScoreSession', () => {
     expect(s.config.totalRounds).toBe(4)
   })
 
+  it('timerSeconds 設定なし（0）ならタイマーは start されない', () => {
+    const s = new ScoreSession()
+    start(s)
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    for (const c of s.children()) s.submitFirst(c.id, 0)
+    s.advanceToSecond()
+    for (const c of s.children()) s.submitSecond(c.id, 0)
+    s.advanceToFinal()
+    expect(s.timer.isRunning).toBe(false)
+    expect(s.timer.totalSeconds).toBe(0)
+  })
+
+  it('timerSeconds > 0 なら advanceToFinal で start、finalizeRound で stop', () => {
+    const s = new ScoreSession()
+    start(s, ['A', 'B', 'C'], { totalRounds: null, timerSeconds: 60 })
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    for (const c of s.children()) s.submitFirst(c.id, 0)
+    s.advanceToSecond()
+    for (const c of s.children()) s.submitSecond(c.id, 0)
+    s.advanceToFinal()
+    expect(s.timer.isRunning).toBe(true)
+    expect(s.timer.totalSeconds).toBe(60)
+    expect(s.timer.remainingSeconds).toBe(60)
+
+    for (const c of s.children()) s.submitFinal(c.id, 0)
+    s.finalizeRound()
+    expect(s.timer.isRunning).toBe(false)
+  })
+
   it('standings はスコア降順', () => {
     const s = new ScoreSession()
     start(s, ['A', 'B', 'C'])
@@ -161,5 +194,39 @@ describe('ScoreSession', () => {
     s.players[2]!.score = 3
     const ranked = s.standings()
     expect(ranked.map((p) => p.name)).toEqual(['B', 'C', 'A'])
+  })
+})
+
+describe('rankedStandings', () => {
+  it('全員違う点数なら 1, 2, 3 と単調', () => {
+    const players = [
+      { id: 0, name: 'A', score: 1 },
+      { id: 1, name: 'B', score: 5 },
+      { id: 2, name: 'C', score: 3 },
+    ]
+    const ranked = rankedStandings(players)
+    expect(ranked.map((r) => `${r.rank}:${r.player.name}`)).toEqual(['1:B', '2:C', '3:A'])
+  })
+
+  it('同点なら同順位、その後は人数分飛ばす（standard competition ranking）', () => {
+    // A=5, B=5, C=3, D=3, E=0 → 1位タイ:A,B / 3位タイ:C,D / 5位:E
+    const players = [
+      { id: 0, name: 'A', score: 5 },
+      { id: 1, name: 'B', score: 5 },
+      { id: 2, name: 'C', score: 3 },
+      { id: 3, name: 'D', score: 3 },
+      { id: 4, name: 'E', score: 0 },
+    ]
+    const ranked = rankedStandings(players)
+    expect(ranked.map((r) => r.rank)).toEqual([1, 1, 3, 3, 5])
+  })
+
+  it('全員同点なら全員 1 位', () => {
+    const players = [
+      { id: 0, name: 'A', score: 7 },
+      { id: 1, name: 'B', score: 7 },
+      { id: 2, name: 'C', score: 7 },
+    ]
+    expect(rankedStandings(players).map((r) => r.rank)).toEqual([1, 1, 1])
   })
 })

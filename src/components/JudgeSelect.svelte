@@ -8,6 +8,17 @@
   let { judges, onConfirm }: Props = $props()
 
   let selectedId = $state<string | null>(null)
+  let query = $state('')
+
+  let filtered = $derived.by(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return judges
+    return judges.filter((j) =>
+      j.id.toLowerCase().includes(q) ||
+      j.question.toLowerCase().includes(q) ||
+      j.options.some((opt) => opt.toLowerCase().includes(q)),
+    )
+  })
 
   function confirm() {
     const card = judges.find((j) => j.id === selectedId)
@@ -16,13 +27,27 @@
 </script>
 
 <section class="space-y-4">
-  <div class="rounded-xl bg-white/10 backdrop-blur p-5 ring-1 ring-white/20">
+  <div class="rounded-xl bg-white/10 backdrop-blur p-5 ring-1 ring-white/20 space-y-3">
     <h2 class="text-lg font-bold">ジャッジを選んでください</h2>
-    <p class="text-sm text-slate-300 mt-1">親が場に出すジャッジカードを 1 枚タップ</p>
+    <p class="text-sm text-slate-300">親が場に出すジャッジカードを 1 枚タップ</p>
+    <div class="relative">
+      <input
+        type="search"
+        bind:value={query}
+        placeholder="質問文 / 選択肢で絞り込み"
+        class="w-full pl-9 pr-3 py-2 rounded-lg bg-black/30 ring-1 ring-white/15 focus:ring-purple-400 outline-none text-sm"
+      />
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-hidden="true">🔍</span>
+    </div>
+    {#if query && filtered.length === 0}
+      <p class="text-sm text-slate-400">該当するカードがありません</p>
+    {:else if query}
+      <p class="text-xs text-slate-400">{filtered.length} 件 / 全 {judges.length} 件</p>
+    {/if}
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    {#each judges as j}
+    {#each filtered as j (j.id)}
       <button
         type="button"
         onclick={() => (selectedId = j.id)}

@@ -1,13 +1,41 @@
 <script lang="ts">
+  import { DEFAULT_TIMER_SECONDS } from '../lib/types'
+
   type Props = {
-    onStart: (names: string[], totalRounds: number | null) => void
+    onStart: (names: string[], totalRounds: number | null, timerSeconds: number) => void
   }
   let { onStart }: Props = $props()
 
   let count = $state(3)
   let names = $state<string[]>(['プレイヤー1', 'プレイヤー2', 'プレイヤー3', 'プレイヤー4', 'プレイヤー5', 'プレイヤー6'])
   let roundsText = $state('')
+  // 入力は分:秒の "M:SS" 形式。デフォルト 3 分。
+  let timerText = $state(formatMinSec(DEFAULT_TIMER_SECONDS))
+  let timerEnabled = $state(true)
   let error = $state('')
+
+  function formatMinSec(totalSeconds: number): string {
+    const m = Math.floor(totalSeconds / 60)
+    const s = totalSeconds % 60
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
+  /** "3:00", "180", "3:5" などを秒に変換。失敗時は null */
+  function parseTimer(text: string): number | null {
+    const t = text.trim()
+    if (!t) return null
+    if (t.includes(':')) {
+      const parts = t.split(':')
+      if (parts.length !== 2) return null
+      const m = Number.parseInt(parts[0]!, 10)
+      const s = Number.parseInt(parts[1]!, 10)
+      if (!Number.isFinite(m) || !Number.isFinite(s) || m < 0 || s < 0 || s >= 60) return null
+      return m * 60 + s
+    }
+    const sec = Number.parseInt(t, 10)
+    if (!Number.isFinite(sec) || sec < 0) return null
+    return sec
+  }
 
   function setCount(n: number) {
     count = n
@@ -23,8 +51,14 @@
       if (!Number.isFinite(parsed) || parsed < 1) { error = 'ラウンド数は 1 以上の整数で入力してください'; return }
       total = parsed
     }
+    let timerSeconds = 0
+    if (timerEnabled) {
+      const parsedTimer = parseTimer(timerText)
+      if (parsedTimer === null) { error = 'タイマーは「3:00」または秒数で入力してください'; return }
+      timerSeconds = parsedTimer
+    }
     error = ''
-    onStart(used, total)
+    onStart(used, total, timerSeconds)
   }
 </script>
 
@@ -70,6 +104,24 @@
       bind:value={roundsText}
       class="w-32 px-3 py-2 rounded-lg bg-black/30 ring-1 ring-white/15 focus:ring-purple-400 outline-none"
     />
+  </div>
+
+  <div class="space-y-2">
+    <div class="flex items-center justify-between">
+      <p class="text-sm text-slate-300">最終判断のタイマー</p>
+      <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+        <input type="checkbox" bind:checked={timerEnabled} class="accent-purple-400" />
+        ON
+      </label>
+    </div>
+    <input
+      type="text"
+      bind:value={timerText}
+      disabled={!timerEnabled}
+      placeholder="3:00"
+      class="w-32 px-3 py-2 rounded-lg bg-black/30 ring-1 ring-white/15 focus:ring-purple-400 outline-none disabled:opacity-50"
+    />
+    <p class="text-xs text-slate-400">「3:00」(分:秒) または秒数。OFF にすると無制限。</p>
   </div>
 
   {#if error}<p class="text-red-300 text-sm">{error}</p>{/if}

@@ -43,4 +43,8 @@ export type RoundState = {
 export type ScorerConfig = {
   /** null → プレイヤー人数（親一巡）で確定 */
   totalRounds: number | null
+  /** 最終判断のタイマー秒数。0 = OFF。デフォルトは 180 秒（3 分） */
+  timerSeconds: number
 }
+
+export const DEFAULT_TIMER_SECONDS = 180
