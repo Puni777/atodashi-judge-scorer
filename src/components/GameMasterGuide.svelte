@@ -5,15 +5,21 @@
     message: string[] | string
     mode?: 'inline' | 'floating'
     collapsed?: boolean
+    animateText?: boolean
     onCollapsedChange?: (collapsed: boolean) => void
     onRequestReset?: () => void
+    onFloatingHeightChange?: (height: number) => void
+    onTypingChange?: (typing: boolean) => void
   }
   let {
     message,
     mode = 'inline',
     collapsed = false,
+    animateText = true,
     onCollapsedChange = () => {},
     onRequestReset = () => {},
+    onFloatingHeightChange = () => {},
+    onTypingChange = () => {},
   }: Props = $props()
 
   const iconBase = `${import.meta.env.BASE_URL}GM_icon/`
@@ -34,12 +40,14 @@
   let mouthFrame = 0
   let typingActive = false
   let typedText = ''
+  let activeMessageText: string | null = null
   let lastAvatarTapAt = 0
   let resetMenuOpen = $state(false)
 
   onMount(() => {
     preloadIcons()
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    let resizeObserver: ResizeObserver | null = null
     reducedMotion = media.matches
     const onChange = () => {
       reducedMotion = media.matches
@@ -52,7 +60,21 @@
     }
     media.addEventListener('change', onChange)
     document.addEventListener('pointerdown', onPointerDown)
+
+    if (mode === 'floating' && rootEl) {
+      const reportHeight = () => {
+        onFloatingHeightChange(Math.ceil(rootEl?.getBoundingClientRect().height ?? 0))
+      }
+      reportHeight()
+      if ('ResizeObserver' in window) {
+        resizeObserver = new ResizeObserver(reportHeight)
+        resizeObserver.observe(rootEl)
+      }
+    }
+
     return () => {
+      resizeObserver?.disconnect()
+      if (mode === 'floating') onFloatingHeightChange(0)
       media.removeEventListener('change', onChange)
       document.removeEventListener('pointerdown', onPointerDown)
       clearTimers()
@@ -60,8 +82,16 @@
   })
 
   $effect(() => {
-    startTyping(messageToText(message))
-    return clearTimers
+    const nextMessage = messageToText(message)
+    const canAnimate = animateText && !reducedMotion && nextMessage.length > 0
+    if (nextMessage !== activeMessageText) {
+      activeMessageText = nextMessage
+      startTyping(nextMessage)
+      return
+    }
+    if (!canAnimate && (isTyping || displayed !== nextMessage)) {
+      showFullText(nextMessage)
+    }
   })
 
   function preloadIcons() {
@@ -78,18 +108,15 @@
     typingActive = false
     typedText = ''
 
-    if (reducedMotion || nextMessage.length === 0) {
-      displayed = nextMessage
-      iconSrc = idleIcon
-      isTyping = false
+    if (reducedMotion || !animateText || nextMessage.length === 0) {
+      showFullText(nextMessage)
       return
     }
 
     displayed = ''
-    isTyping = true
-    typingActive = true
     mouthFrame = 0
     iconSrc = mouthClosedIcon
+    setTypingActive(true)
     scheduleNextMouth(currentRun)
     typeNext(currentRun, Array.from(nextMessage), 0)
   }
@@ -122,9 +149,16 @@
 
   function finishTyping() {
     clearMouthTimer()
-    typingActive = false
     iconSrc = idleIcon
-    isTyping = false
+    setTypingActive(false)
+  }
+
+  function showFullText(nextMessage: string) {
+    clearTimers()
+    typedText = nextMessage
+    displayed = nextMessage
+    iconSrc = idleIcon
+    setTypingActive(false)
   }
 
   function clearTimers() {
@@ -136,7 +170,7 @@
       window.clearTimeout(tapTimer)
       tapTimer = null
     }
-    typingActive = false
+    setTypingActive(false)
     clearMouthTimer()
   }
 
@@ -175,6 +209,13 @@
 
   function messageToText(value: string[] | string): string {
     return Array.isArray(value) ? value.filter((line) => line.length > 0).join('\n') : value
+  }
+
+  function setTypingActive(active: boolean) {
+    const changed = typingActive !== active || isTyping !== active
+    typingActive = active
+    isTyping = active
+    if (changed) onTypingChange(active)
   }
 
   let ariaText = $derived(messageToText(message))

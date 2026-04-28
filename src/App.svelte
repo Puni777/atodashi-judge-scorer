@@ -17,10 +17,14 @@
   import GameOver from './components/GameOver.svelte'
   import TimerDisplay from './components/TimerDisplay.svelte'
   import GameMasterGuide from './components/GameMasterGuide.svelte'
+  import AppHeader from './components/AppHeader.svelte'
+  import OptionsModal from './components/OptionsModal.svelte'
 
   const SESSION_STORAGE_KEY = 'atodashi-judge-scorer:session:v1'
   const UI_STORAGE_KEY = 'atodashi-judge-scorer:ui:v1'
   const UI_STORAGE_VERSION = 1
+  const INLINE_GM_REAPPEAR_RATIO = 0.65
+  const floatingGmAnimatedMessageKeys = new Set<string>()
 
   type UiSettingsSnapshot = {
     version: typeof UI_STORAGE_VERSION
@@ -52,6 +56,9 @@
   let inlineGmVisible = $state(true)
   let audioManager: AudioManager | null = null
   let audioStatus = $state<AudioLoadStatus>('loading')
+  let optionsOpen = $state(false)
+  let floatingGmHeight = $state(0)
+  let floatingGmTyping = $state(false)
   let previousAudioPhase: Phase = Phase.Setup
   let alarmPlayedForCurrentFinal = false
 
@@ -95,7 +102,15 @@
 
     if (inlineGmHost && 'IntersectionObserver' in window) {
       gmObserver = new IntersectionObserver(([entry]) => {
-        inlineGmVisible = Boolean(entry?.isIntersecting)
+        if (!entry?.isIntersecting) {
+          inlineGmVisible = false
+          return
+        }
+        if (entry.intersectionRatio >= INLINE_GM_REAPPEAR_RATIO) {
+          inlineGmVisible = true
+        }
+      }, {
+        threshold: [0, INLINE_GM_REAPPEAR_RATIO],
       })
       gmObserver.observe(inlineGmHost)
     } else {
@@ -187,6 +202,13 @@
     }
   })
 
+  $effect(() => {
+    if (!floatingGmRendered) {
+      floatingGmHeight = 0
+      floatingGmTyping = false
+    }
+  })
+
   function safe(action: () => void): boolean {
     try {
       action()
@@ -206,6 +228,13 @@
   ) {
     activeThemeId = themeId
     safe(() => session.startGame(names, { totalRounds, timerSeconds, themeId }))
+  }
+
+  function handleThemeChange(themeId: ThemeId) {
+    activeThemeId = themeId
+    if (session.players.length > 0) {
+      session.config = { ...session.config, themeId }
+    }
   }
 
   function handleEnterParentSetup() {
@@ -297,11 +326,20 @@
     bgmVolume = volume
   }
 
-  function handleResetToSetupWithConfirm() {
+  function confirmResetToSetup(): boolean {
     const ok = window.confirm(
       'ゲームを初期化してセットアップ画面に戻りますか？現在の進行状況は削除されます。',
     )
     if (ok) handleResetToSetup()
+    return ok
+  }
+
+  function handleResetToSetupWithConfirm() {
+    confirmResetToSetup()
+  }
+
+  function handleOptionsResetToSetup() {
+    if (confirmResetToSetup()) optionsOpen = false
   }
 
   function handleResetToSetup() {
@@ -403,18 +441,43 @@
     return interactive.getAttribute('data-audio') === 'confirm' ? 'confirm' : 'tap'
   }
 
+  function handleFloatingGmHeightChange(height: number) {
+    floatingGmHeight = Math.max(0, Math.ceil(height))
+  }
+
+  function handleFloatingGmTypingChange(typing: boolean) {
+    floatingGmTyping = typing
+    if (typing && gmMessageKey.length > 0) {
+      floatingGmAnimatedMessageKeys.add(gmMessageKey)
+    }
+  }
+
+  function gmMessageToAnimationKey(value: string[] | string): string {
+    return Array.isArray(value) ? value.join('\n') : value
+  }
+
   let totalRounds = $derived(session.config.totalRounds ?? session.players.length)
   let isLastRound = $derived(session.roundIndex + 1 >= totalRounds)
   let gmMessage = $derived(getGmMessage(gmMessages, session))
+  let gmMessageKey = $derived(gmMessageToAnimationKey(gmMessage))
+  let floatingGmRendered = $derived(
+    floatingGmEnabled && session.phase !== Phase.Setup && !inlineGmVisible,
+  )
+  let shouldAnimateFloatingGm = $derived(
+    floatingGmRendered &&
+      gmMessageKey.length > 0 &&
+      !floatingGmAnimatedMessageKeys.has(gmMessageKey),
+  )
 </script>
 
 <main
   class="app-shell"
-  class:app-shell-floating-gm={floatingGmEnabled && session.phase !== Phase.Setup}
+  class:app-shell-floating-gm={floatingGmRendered}
   data-theme={activeThemeId}
+  style={`--floating-gm-height: ${floatingGmHeight}px`}
 >
   <div class="max-w-2xl mx-auto p-4 sm:p-8 space-y-5">
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight ui-title">後出しジャッジ Scorer</h1>
+    <AppHeader onOpenOptions={() => (optionsOpen = true)} />
 
     {#if loadError}
       <div class="ui-alert-danger rounded-lg p-4">
@@ -429,7 +492,7 @@
     {/if}
 
     <div bind:this={inlineGmHost}>
-      <GameMasterGuide message={gmMessage} />
+      <GameMasterGuide message={gmMessage} animateText={!floatingGmTyping} />
     </div>
 
     {#if session.phase === Phase.Setup}
@@ -464,7 +527,7 @@
         <Setup
           onStart={handleStart}
           selectedThemeId={activeThemeId}
-          onThemeChange={(themeId) => (activeThemeId = themeId)}
+          onThemeChange={handleThemeChange}
           {floatingGmEnabled}
           onFloatingGmChange={handleFloatingGmChange}
           {seEnabled}
@@ -552,13 +615,36 @@
     {/if}
   </div>
 
-  {#if floatingGmEnabled && session.phase !== Phase.Setup && !inlineGmVisible}
+  <OptionsModal
+    open={optionsOpen}
+    selectedThemeId={activeThemeId}
+    {floatingGmEnabled}
+    {seEnabled}
+    {bgmEnabled}
+    {seVolume}
+    {bgmVolume}
+    {audioStatus}
+    canResetToSetup={session.phase !== Phase.Setup || Boolean(pendingResume)}
+    onClose={() => (optionsOpen = false)}
+    onResetToSetup={handleOptionsResetToSetup}
+    onThemeChange={handleThemeChange}
+    onFloatingGmChange={handleFloatingGmChange}
+    onSeEnabledChange={handleSeEnabledChange}
+    onBgmEnabledChange={handleBgmEnabledChange}
+    onSeVolumeChange={handleSeVolumeChange}
+    onBgmVolumeChange={handleBgmVolumeChange}
+  />
+
+  {#if floatingGmRendered}
     <GameMasterGuide
       message={gmMessage}
       mode="floating"
       collapsed={floatingGmCollapsed}
+      animateText={shouldAnimateFloatingGm}
       onCollapsedChange={handleFloatingGmCollapsedChange}
       onRequestReset={handleResetToSetupWithConfirm}
+      onFloatingHeightChange={handleFloatingGmHeightChange}
+      onTypingChange={handleFloatingGmTypingChange}
     />
   {/if}
 </main>

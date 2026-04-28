@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { ThemeId } from '../lib/types'
   import type { AudioLoadStatus } from '../lib/audio/audioManager'
-  import { DEFAULT_THEME_ID, DEFAULT_TIMER_SECONDS, THEME_OPTIONS } from '../lib/types'
+  import { DEFAULT_THEME_ID, DEFAULT_TIMER_SECONDS } from '../lib/types'
+  import GameOptions from './GameOptions.svelte'
 
   type Props = {
     onStart: (
@@ -62,30 +63,6 @@
     count = n
   }
 
-  function setTheme(nextThemeId: ThemeId) {
-    onThemeChange(nextThemeId)
-  }
-
-  function setFloatingGm(enabled: boolean) {
-    onFloatingGmChange(enabled)
-  }
-
-  function setSeEnabled(enabled: boolean) {
-    onSeEnabledChange(enabled)
-  }
-
-  function setBgmEnabled(enabled: boolean) {
-    onBgmEnabledChange(enabled)
-  }
-
-  function setSeVolume(volumePercent: number) {
-    onSeVolumeChange(clampUnit(volumePercent / 100))
-  }
-
-  function setBgmVolume(volumePercent: number) {
-    onBgmVolumeChange(clampUnit(volumePercent / 100))
-  }
-
   function setTimerPreset(seconds: number) {
     timerEnabled = seconds > 0
     timerMinutes = Math.floor(seconds / 60)
@@ -96,19 +73,6 @@
     timerMinutes = Math.max(0, Math.min(60, Math.floor(Number(timerMinutes) || 0)))
     timerSecondsPart = Math.max(0, Math.min(59, Math.floor(Number(timerSecondsPart) || 0)))
   }
-
-  function clampUnit(value: number): number {
-    return Math.max(0, Math.min(1, value))
-  }
-
-  let seVolumePercent = $derived(Math.round(seVolume * 100))
-  let bgmVolumePercent = $derived(Math.round(bgmVolume * 100))
-  let audioStatusLabel = $derived.by(() => {
-    if (!seEnabled && !bgmEnabled) return '音声OFF'
-    if (audioStatus === 'ready') return '音声OK'
-    if (audioStatus === 'error') return '音声準備を再試行中'
-    return '音声準備中...'
-  })
 
   function submit() {
     const used = names.slice(0, count).map((n) => n.trim())
@@ -229,121 +193,21 @@
     <p class="text-xs ui-text-dim">OFF にすると無制限。タイマー終了時にアラームが鳴ります。</p>
   </div>
 
-  <div class="space-y-2">
-    <p class="text-sm ui-text-muted">スタイル</p>
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      {#each THEME_OPTIONS as theme}
-        <button
-          type="button"
-          onclick={() => setTheme(theme.id)}
-          class="ui-theme-option rounded-lg px-3 py-3 font-bold transition {selectedThemeId === theme.id
-            ? 'ui-theme-option-active'
-            : ''}"
-        >
-          <span class="theme-swatch" data-preview={theme.id} aria-hidden="true"></span>
-          <span>{theme.name}</span>
-        </button>
-      {/each}
-    </div>
-  </div>
-
-  <div class="ui-card-soft rounded-lg p-4 flex items-center justify-between gap-3">
-    <div>
-      <p class="font-bold ui-text-main">GM固定表示</p>
-      <p class="text-xs ui-text-dim">スマホでは進行中も左下にGMを残します。</p>
-    </div>
-    <label class="ui-switch">
-      <input
-        type="checkbox"
-        checked={floatingGmEnabled}
-        onchange={(e) => setFloatingGm(e.currentTarget.checked)}
-      />
-      <span aria-hidden="true"></span>
-      <span class="sr-only">GM固定表示</span>
-    </label>
-  </div>
-
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-    <div class="ui-card-soft rounded-lg p-4 flex items-center justify-between gap-3">
-      <div>
-        <p class="font-bold ui-text-main">SE</p>
-        <p class="text-xs ui-text-dim">タップや得点表示の効果音。</p>
-      </div>
-      <label class="ui-switch">
-        <input
-          type="checkbox"
-          checked={seEnabled}
-          onchange={(e) => setSeEnabled(e.currentTarget.checked)}
-        />
-        <span aria-hidden="true"></span>
-        <span class="sr-only">SE</span>
-      </label>
-    </div>
-
-    <div class="ui-card-soft rounded-lg p-4 flex items-center justify-between gap-3">
-      <div>
-        <p class="font-bold ui-text-main">BGM</p>
-        <p class="text-xs ui-text-dim">クマノミの夢を流します。</p>
-      </div>
-      <label class="ui-switch">
-        <input
-          type="checkbox"
-          checked={bgmEnabled}
-          onchange={(e) => setBgmEnabled(e.currentTarget.checked)}
-        />
-        <span aria-hidden="true"></span>
-        <span class="sr-only">BGM</span>
-      </label>
-    </div>
-  </div>
-
-  <div class="ui-card-soft rounded-lg p-3 flex items-center justify-between gap-3">
-    <p class="text-sm font-bold ui-text-main">{audioStatusLabel}</p>
-    <span
-      class="ui-audio-status-dot"
-      class:ui-audio-status-dot-ready={audioStatus === 'ready'}
-      class:ui-audio-status-dot-error={audioStatus === 'error'}
-      aria-hidden="true"
-    ></span>
-  </div>
-
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-    <label class="ui-card-soft rounded-lg p-4 space-y-2">
-      <div class="flex items-center justify-between gap-3">
-        <span class="font-bold ui-text-main">SE音量</span>
-        <span class="text-sm font-mono ui-text-muted">{seVolumePercent}%</span>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="100"
-        step="5"
-        value={seVolumePercent}
-        disabled={!seEnabled}
-        oninput={(e) => setSeVolume(Number(e.currentTarget.value))}
-        onchange={(e) => setSeVolume(Number(e.currentTarget.value))}
-        class="ui-range w-full"
-      />
-    </label>
-
-    <label class="ui-card-soft rounded-lg p-4 space-y-2">
-      <div class="flex items-center justify-between gap-3">
-        <span class="font-bold ui-text-main">BGM音量</span>
-        <span class="text-sm font-mono ui-text-muted">{bgmVolumePercent}%</span>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="100"
-        step="5"
-        value={bgmVolumePercent}
-        disabled={!bgmEnabled}
-        oninput={(e) => setBgmVolume(Number(e.currentTarget.value))}
-        onchange={(e) => setBgmVolume(Number(e.currentTarget.value))}
-        class="ui-range w-full"
-      />
-    </label>
-  </div>
+  <GameOptions
+    {selectedThemeId}
+    {floatingGmEnabled}
+    {seEnabled}
+    {bgmEnabled}
+    {seVolume}
+    {bgmVolume}
+    {audioStatus}
+    onThemeChange={onThemeChange}
+    onFloatingGmChange={onFloatingGmChange}
+    onSeEnabledChange={onSeEnabledChange}
+    onBgmEnabledChange={onBgmEnabledChange}
+    onSeVolumeChange={onSeVolumeChange}
+    onBgmVolumeChange={onBgmVolumeChange}
+  />
 
   {#if error}<p class="ui-text-danger text-sm">{error}</p>{/if}
 

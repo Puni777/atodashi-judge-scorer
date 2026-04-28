@@ -9,7 +9,7 @@
     "confirm": {
       "label": "決定ボタンを押す",
       "src": "audio/se/confirm-button.mp3",
-      "volume": 0.65
+      "volume": 0.5
     },
     "roundScore": {
       "label": "スコア表示",

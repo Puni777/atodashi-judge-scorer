@@ -1,372 +1,560 @@
-# 引き継ぎ資料 — 後出しジャッジ Scorer (atodashi-judge-scorer)
+# 引き継ぎ資料: 後出しジャッジ Scorer
 
-このドキュメントは、別の AI または開発者が本リポジトリでの実装を引き継ぐための前提情報をまとめたものです。これ 1 つを読めば、リポジトリの目的・設計意図・現在のコード構造・既知の落とし穴が把握できることを目的としています。
+最終更新: 2026-04-28
+
+この資料は、カードゲーム「後出しジャッジ」の得点計算補助 Web アプリを引き継ぐためのメモです。目的、現在の実装、設計上の決定事項、触るべきファイル、既知の注意点をまとめています。
 
 ---
 
 ## 1. プロジェクトの目的
 
-カードゲーム「**後出しジャッジ**」の **得点計算補助 Web アプリ** を作っています。
+このリポジトリでは、体験型モラルカードゲーム「後出しジャッジ」の **Scorer** を作っています。
 
-- **位置づけ**: ゲーム本体は物理カードでプレイする。本アプリはあくまで「判断入力＋得点計算＋親ローテ」だけを補助する卓上スコアボード
-- **ユーザー**: ユーザー（オーナー）は大学 4 年生のチームで開発中。**Web 開発の経験は浅い**（フレームワーク用語の前提を共有していない）一方、**Python / ロジック設計の力はある**ので、フロント周りは丁寧に説明、ロジック議論はエンジニア前提で OK
-- **直近のマイルストーン**: 2026 年 5 月末以降に **高校 1 年生にテストプレイ**してもらう。学校 Wi-Fi で SSH 不可のため、クラウド静的配信（GitHub Pages）が必須
-- **重視する観点**: 「大学生チームが高校生に見せる」状況なので、**完成度・見栄え**もこだわる前提
+- ゲーム本体は物理カードで遊ぶ
+- Web アプリは卓上に置くスコアボードとして使う
+- アプリの担当範囲は、プレイヤー登録、ジャッジ選択、判断入力、得点計算、親ローテ、タイマー、進行案内
+- シチュエーションカード、アイテムカード、界隈ルールカードの管理は物理カード側に任せる
+
+直近の利用想定は、2026 年 5 月末以降の高校 1 年生向けテストプレイです。学校 Wi-Fi で SSH が使えない可能性があるため、GitHub Pages で静的配信できることが重要です。
 
 ---
 
-## 2. リポジトリと関連プロジェクト
+## 2. リポジトリ情報
 
-### 本リポジトリ
-- GitHub: `Puni777/atodashi-judge-scorer` (**public**)
+- GitHub: `Puni777/atodashi-judge-scorer`
 - 公開 URL: https://puni777.github.io/atodashi-judge-scorer/
 - ローカル: `C:\Users\puni\Documents\claude\atodashi-judge-scorer\`
-- デプロイ: GitHub Actions で `main` push 時に自動 → GitHub Pages
+- デプロイ: `main` push で GitHub Actions から GitHub Pages に自動反映
 
-### 旧 Python 実装（移植元）
-- GitHub: `Puni777/atodashi_judge` (**private**)
+旧 Python 実装は別リポジトリです。
+
+- GitHub: `Puni777/atodashi_judge`
 - ローカル: `C:\Users\puni\Documents\claude\atodashi_judge\`
-- 重要ファイル（移植元として参照する）:
-  - [`game.py`](../atodashi_judge/game.py) — `RoundState`, `score_round` 等のコアロジック
-  - [`scorer/session.py`](../atodashi_judge/scorer/session.py) — 物理カード前提の軽量ステートマシン（本アプリの直接の元）
-  - [`scorer/app.py`](../atodashi_judge/scorer/app.py) — Flet 製 Web UI（UI フローの参考。判断画面の構造は移植済み）
-  - [`tests/test_scorer_session.py`](../atodashi_judge/tests/test_scorer_session.py) — テストケース（vitest に移植済み）
-  - [`data/judges.json`](../atodashi_judge/data/judges.json) — ジャッジカード 12 枚（既に `public/data/judges.json` にコピー済み）
-
-旧プロジェクトには `situations.json`（30 枚）/ `items.json`（40 枚）/ `kaiwai_rules.json`（12 枚）もあるが、**本アプリでは扱わない**（後述「設計上の決定事項」）。
+- 参照価値が高いファイル:
+  - `game.py`: 元の採点ロジック
+  - `scorer/session.py`: スコアラー用ステートマシン
+  - `scorer/app.py`: Flet 版 UI
+  - `tests/test_scorer_session.py`: 採点ロジックの比較元
+  - `data/judges.json`: ジャッジカード
 
 ---
 
 ## 3. 技術スタック
 
-| | バージョン | 備考 |
-|---|---|---|
-| Svelte | 5.55.4 | runes (`$state`, `$derived`, `$props`, `$effect`) を使用 |
-| TypeScript | 6.0.3 | `strict: true` |
-| Vite | 8.0.10 | `@sveltejs/vite-plugin-svelte` v7 |
-| Tailwind CSS | 4.2.4 | `@tailwindcss/vite` 経由（設定ファイル不要、CSS 内 `@import "tailwindcss"`） |
-| vitest | 4.1.5 | ロジックテスト用。svelte plugin 経由で `.svelte.ts` も処理可能 |
-| jsdom | 29.0.2 | （現状未使用、必要になれば DOM テストに） |
-| svelte-check | 4.4.6 | 型チェック (`npm run check`) |
+| 項目 | 内容 |
+|---|---|
+| UI | Svelte 5.55.4 |
+| Build | Vite 8.0.10 |
+| Language | TypeScript 6.0.3, `strict: true` |
+| CSS | Tailwind CSS 4.2.4 |
+| Test | Vitest 4.1.5 |
+| 型チェック | svelte-check 4.4.6 |
+| Deploy | GitHub Pages |
+
+Svelte 5 の runes を使っています。クラス内 state は `.svelte.ts` ファイルに置いています。
 
 ---
 
-## 4. ディレクトリ構成
+## 4. 現在の機能
 
-```
+実装済み:
+
+- 3〜8人のプレイヤー登録
+- プレイヤー名、ラウンド数、タイマー秒数の設定
+- テーマ選択
+- BGM / SE の ON/OFF と音量調整
+- GM キャラクターの進行案内
+- 進行中も表示できるフローティング GM
+- ジャッジカード一覧と検索
+- 第1判断、第2判断、最終判断の入力
+- 前回判断の表示
+- 最終判断フェーズのカウントダウンタイマー
+- 時間切れアラーム
+- 採点と累計スコア表示
+- 親ローテーション
+- 同点順位対応の最終結果
+- localStorage による進行中ゲームの保存と再開
+- UI 設定の保存
+- GitHub Pages 向けの base path 対応
+
+現在も扱わないもの:
+
+- シチュエーションカードの山札
+- アイテムカードの手札、提出履歴、捨て札
+- 界隈ルールカードの管理
+- 物理カードのシャッフルや配布
+
+この切り分けは意図的です。アプリを「軽いスコアラー」に保つことで、卓上での操作が単純になり、物理カードゲームとしての体験を邪魔しないようにしています。
+
+---
+
+## 5. ディレクトリ構成
+
+```text
 atodashi-judge-scorer/
-├── HANDOFF.md                           # このファイル
+├── HANDOFF.md
 ├── README.md
-├── index.html                           # エントリ。/src/main.ts を読む
+├── 企画書.txt
+├── index.html
 ├── package.json
-├── tsconfig.json
-├── vite.config.js                       # GH Pages 用に base を環境変数で切替
-├── vitest.config.ts                     # svelte plugin を含む（runes コンパイル必須）
-├── svelte.config.js                     # vitePreprocess() を設定
+├── vite.config.js
+├── vitest.config.ts
+├── svelte.config.js
 ├── public/
 │   ├── data/
-│   │   └── judges.json                  # ジャッジカード 12 枚（旧プロジェクトと同期）
+│   │   ├── judges.json
+│   │   ├── gm_messages.json
+│   │   └── audio_assets.json
+│   ├── audio/
+│   │   ├── bgm/
+│   │   └── se/
+│   ├── GM_icon/
 │   └── favicon.svg
-├── .github/workflows/                   # GH Pages 自動デプロイ
 └── src/
-    ├── main.ts                          # Svelte 5 mount
-    ├── app.css                          # Tailwind v4 の @import のみ
-    ├── vite-env.d.ts
-    ├── App.svelte                       # フェーズルーター（全コンポーネントの分岐元）
+    ├── App.svelte
+    ├── app.css
+    ├── main.ts
     ├── components/
-    │   ├── Setup.svelte                 # 人数 / 名前 / ラウンド数 / タイマー
-    │   ├── RoundHeader.svelte           # ラウンド N / 親 / 全員のスコア（常時表示）
-    │   ├── JudgeSelect.svelte           # ジャッジ 12 枚から 1 枚（検索付き）
-    │   ├── JudgmentPhase.svelte         # 1st/2nd/最終の共通レイアウト
-    │   ├── ChildJudgmentRow.svelte      # 子 1 人分の入力ボックス（前回判断併記）
-    │   ├── TimerDisplay.svelte          # 最終判断の MM:SS カウントダウン
-    │   ├── RoundScore.svelte            # ラウンド差分 + 累計
-    │   └── GameOver.svelte              # 同順位対応の最終結果
+    │   ├── Setup.svelte
+    │   ├── RoundHeader.svelte
+    │   ├── JudgeSelect.svelte
+    │   ├── JudgmentPhase.svelte
+    │   ├── ChildJudgmentRow.svelte
+    │   ├── TimerDisplay.svelte
+    │   ├── RoundScore.svelte
+    │   ├── GameOver.svelte
+    │   └── GameMasterGuide.svelte
     └── lib/
-        ├── types.ts                     # 公開型・enum・定数
+        ├── types.ts
+        ├── audio/
+        │   ├── assets.ts
+        │   ├── assets.test.ts
+        │   └── audioManager.ts
         └── scorer/
-            ├── session.svelte.ts        # ScoreSession + rankedStandings
-            ├── session.test.ts          # 13 ケース
-            ├── timer.svelte.ts          # CountdownTimer + イベントエミッタ
-            ├── timer.test.ts            # 8 ケース
-            └── judges.ts                # judges.json fetcher
+            ├── session.svelte.ts
+            ├── session.test.ts
+            ├── timer.svelte.ts
+            ├── timer.test.ts
+            ├── judges.ts
+            ├── gmMessages.ts
+            └── gmMessages.test.ts
 ```
-
-**`.svelte.ts` 拡張子は重要**: Svelte 5 の `$state` rune を使うクラスを書くにはこの拡張子が必要（後述「落とし穴」参照）。
 
 ---
 
-## 5. コアロジック仕様
+## 6. コア仕様
 
-### 5.1 採点アルゴリズム（Python と完全一致）
+### 6.1 フェーズ
 
-`src/lib/scorer/session.svelte.ts` の `scoreRound`:
+`src/lib/types.ts` の `Phase` で管理しています。
 
-```
-親:
-  shifted_on_second = 子のうち 第1判断 ≠ 第2判断 の人数
-  shifted_on_final  = 子のうち 第2判断 ≠ 最終判断 の人数
-  親の得点δ = shifted_on_second + shifted_on_final
-
-各子:
-  if 最終判断 ≠ 第2判断:           # 自分が変えた
-    子の得点δ = 0
-  else:                              # 自分は据え置き
-    pulled = 他の子のうち
-             「第2→最終で変え、かつ最終が自分と一致」する人数
-    子の得点δ = pulled
+```text
+SETUP
+→ ROUND_START
+→ PARENT_SETUP
+→ FIRST_JUDGMENT
+→ SECOND_JUDGMENT
+→ FINAL_JUDGMENT
+→ ROUND_SCORE
+→ ROUND_START または GAME_OVER
 ```
 
-代表テストケース（`test_full_round_flow_and_scoring`）:
-- 親=A、子=B/C
-- B: 1st=0 → 2nd=1 → final=1（最終で据え置き）
-- C: 1st=0 → 2nd=0 → final=1（最終で変えた）
-- 期待値: **A=2, B=1, C=0**
+主な遷移メソッドは `src/lib/scorer/session.svelte.ts` の `ScoreSession` にあります。
 
-### 5.2 フェーズ遷移
+- `startGame`
+- `enterParentSetup`
+- `setJudge`
+- `enterFirstJudgment`
+- `submitFirst`
+- `advanceToSecond`
+- `submitSecond`
+- `advanceToFinal`
+- `submitFinal`
+- `finalizeRound`
+- `nextRound`
+- `resetToSetup`
 
+### 6.2 採点ロジック
+
+採点は旧 Python 実装と一致させています。
+
+親の得点:
+
+```text
+第一判断 → 第二判断で変わった子の人数
++ 第二判断 → 最終判断で変わった子の人数
 ```
-SETUP → ROUND_START → PARENT_SETUP → FIRST_JUDGMENT
-  → SECOND_JUDGMENT → FINAL_JUDGMENT → ROUND_SCORE
-  → (次のラウンド) ROUND_START | (最終ラウンドなら) GAME_OVER
+
+子の得点:
+
+```text
+第二判断 → 最終判断で自分が変えた場合: 0 点
+第二判断から据え置いた場合:
+  他の子のうち、第二判断から最終判断で変わり、
+  かつ自分の最終判断と一致した人数
 ```
 
-- `Phase` enum は `src/lib/types.ts`
-- 各フェーズの遷移メソッドは `ScoreSession` 上にある（`enterParentSetup`, `enterFirstJudgment`, `advanceToSecond`, `advanceToFinal`, `finalizeRound`, `nextRound`）
-- 入力チェック: 第 2 判断は第 1 判断が必須、最終判断は第 2 判断が必須、option index は `0 ≤ x < judge.options.length`
+代表例:
 
-### 5.3 親ローテと total rounds
+```text
+親=A、子=B/C
+B: 1st=0 → 2nd=1 → final=1
+C: 1st=0 → 2nd=0 → final=1
+結果: A=2, B=1, C=0
+```
 
-- 親 = `players[roundIndex % players.length]`（id 0 から順番）
-- `config.totalRounds` が `null` のとき → プレイヤー人数（親一巡）。`startGame` 時に `players.length` で確定
-
-### 5.4 タイマー（CountdownTimer）
-
-`src/lib/scorer/timer.svelte.ts`:
-
-- 最終判断フェーズに入ると自動で start、`finalizeRound` / `nextRound` / `startGame` で stop / reset
-- **イベント API**: `'started' / 'tick' / 'expired' / 'stopped'` を `timer.on(event, cb)` で購読可能。`on` は unsubscribe 関数を返す
-- **Scheduler 注入**: コンストラクタ引数で `setInterval / clearInterval` を差し替え可能（テストでは noop scheduler で `tick()` 手動呼び出し）
-- **0 秒設定 = OFF**: `start(0)` は何もしない
-- **時間切れで自動採点はしない**: 操作ミスで判断が揃わぬまま締まると困るため、視覚的アラートのみ
-
-将来の音再生はこう足せる:
+### 6.3 親ローテーション
 
 ```ts
-// 例: App.svelte の onMount 内で
-session.timer.on('expired', () => new Audio('/sounds/buzzer.mp3').play())
-session.timer.on('tick', (sec) => {
-  if (sec === 30 || sec === 10) new Audio('/sounds/warn.mp3').play()
-})
+players[roundIndex % players.length]
 ```
 
-### 5.5 同順位（rankedStandings）
+`totalRounds` が指定されない場合は、開始時にプレイヤー人数分で確定します。
 
-`src/lib/scorer/session.svelte.ts` から名前付きエクスポート:
+### 6.4 人数
 
-```ts
-export function rankedStandings(players: Player[]): { rank: number; player: Player }[]
-```
+現在は 3〜8人です。
 
-- standard competition ranking（1, 1, 3 形式）
-- 5 人 [5, 5, 3, 3, 0] → ranks [1, 1, 3, 3, 5]
-- 全員同点なら全員 1 位（GameOver 画面では全員 🥇）
+- `src/lib/scorer/session.svelte.ts`: `MIN_PLAYERS = 3`, `MAX_PLAYERS = 8`
+- `src/components/Setup.svelte`: `[3, 4, 5, 6, 7, 8]`
+
+人数を変える場合は、ロジックと UI の両方を更新してください。
 
 ---
 
-## 6. UI フロー（卓上 scoreboard モデル）
+## 7. UI フロー
 
-**重要な前提**: 端末を回す pass-and-play ではなく、**1 台を卓上に置いて全員で操作する**モデル。1 画面に全子の判断ボタンが並ぶ。
+操作モデルは pass-and-play ではなく、1 台を卓中央に置くスコアボードです。
 
-1. **Setup**: 人数（2〜6）・名前・ラウンド数（空欄で人数）・タイマー（既定 3:00、ON/OFF 切替）
-2. **RoundStart**: 「親: X さん」「ジャッジを選ぶ」ボタン
-3. **ParentSetup**: 12 枚から検索付きで 1 枚選び「決定」
-4. **FirstJudgment**: 全子のボックスを縦に並べ、各自選択肢を押す。全員入力で「親がアイテムを追加 → 次へ」が有効化
-5. **SecondJudgment**: 同上 + 各子に「第1: 〇〇」を併記。ヒント「親がアイテムを追加したあと」
-6. **FinalJudgment**: 同上 + 「第2: 〇〇」併記 + **TimerDisplay 表示**（残り時間）。「採点する」で採点
-7. **RoundScore**: 各人の差分（+N）と累計、「次のラウンドへ」または「結果発表」
-8. **GameOver**: 同順位対応の順位表 + 「もう 1 試合」（同メンバーで再スタート）
+1. Setup
+   プレイヤー人数、名前、ラウンド数、話し合い時間、テーマ、GM表示、音声を設定する
+2. RoundStart
+   今回の親を表示する
+3. ParentSetup
+   親がジャッジカードを選ぶ
+4. FirstJudgment
+   子全員が第1判断を入力する
+5. SecondJudgment
+   親が物理アイテムカードを追加したあと、子全員が第2判断を入力する
+6. FinalJudgment
+   話し合いと子のアイテム追加後、子全員が最終判断を入力する
+7. RoundScore
+   ラウンドごとの得点差分と累計を表示する
+8. GameOver
+   最終順位を表示する。同点は同順位
 
-`RoundHeader` は ParentSetup〜RoundScore で常時表示。
-
----
-
-## 7. 設計上の決定事項（変えない方針）
-
-| 項目 | 決定 | 理由 |
-|---|---|---|
-| シチュエーションカード | **持たない** | 物理カードに任せる、UI 複雑度を下げる |
-| アイテムカード（親/子） | **持たない** | 同上 |
-| 界隈ルール | **持たない** | 同上 |
-| 山札・捨て札・手札 | **持たない** | スコアラーは判断と得点のみ管轄 |
-| 操作モデル | 卓上 scoreboard | pass-and-play ではない。1 画面で全員分入力 |
-| タイマー期限切れ | 自動採点しない | 操作ミスで未入力のまま締まる事故防止 |
-| 判断履歴の表示 | 第 2 / 最終 で前回値を併記 | 紙ゲームのメモ役を肩代わり（Python 版にはない補助） |
-| プレイヤー人数 | 2〜6 人 | Python 実装と同じ |
-
-memory にも記録済み: [project_scorer_design.md](C:\Users\puni\.claude\projects\C--Users-puni-Documents-claude-atodashi-judge-scorer\memory\project_scorer_design.md)
+GM メッセージは現在フェーズ、入力進捗、タイマー状態に応じて変わります。
 
 ---
 
-## 8. 知っておくべき落とし穴
+## 8. 永続化
 
-### 8.1 `$state` はクラスインスタンスを deeply proxy しない
+`src/App.svelte` で localStorage を使っています。
 
-❌ これは動かない（過去にハマった）:
-```ts
-// .svelte ファイル内
-let session = $state(new ScoreSession())
-session.phase = Phase.RoundStart  // 値は変わるが UI は再レンダリングしない
+- `atodashi-judge-scorer:session:v1`: 進行中ゲーム
+- `atodashi-judge-scorer:ui:v1`: UI 設定
+
+セッション保存対象:
+
+- phase
+- config
+- players
+- roundIndex
+- roundState
+- history
+- timer snapshot
+- savedAt
+
+読み込み時は `parseScoreSessionSnapshot` で検証してから復元します。不正な保存データは破棄されます。
+
+タイマーは `endsAt` から残り時間を再計算します。復元時点で期限切れなら expired 扱いになります。
+
+---
+
+## 9. GM メッセージ
+
+実装:
+
+- `src/components/GameMasterGuide.svelte`
+- `src/lib/scorer/gmMessages.ts`
+- `public/data/gm_messages.json`
+
+特徴:
+
+- 口パク画像の切替
+- タイピング表示
+- `prefers-reduced-motion` 対応
+- inline 表示と floating 表示
+- floating GM のダブルタップで「セットアップに戻る」メニュー
+- `{parent}`, `{judge}`, `{round}`, `{totalRounds}`, `{remaining}` などのテンプレート変数
+- v1 形式の単一文 JSON への後方互換
+
+GM アイコン:
+
+- `public/GM_icon/0_ほほえみ.png`
+- `public/GM_icon/1_閉じ口.png`
+- `public/GM_icon/2_開口.png`
+
+---
+
+## 10. 音声
+
+実装:
+
+- `src/lib/audio/audioManager.ts`
+- `src/lib/audio/assets.ts`
+- `public/data/audio_assets.json`
+- `public/audio/`
+
+音声 ID:
+
+- SE: `tap`, `confirm`, `roundScore`, `finalScore`, `alarm`
+- BGM: `main`
+
+特徴:
+
+- SE と BGM の個別 ON/OFF
+- SE と BGM の音量調整
+- BGM 自動再生のブラウザ制限に合わせ、最初のユーザー操作後に再開
+- Web Audio API を優先し、HTMLAudioElement にフォールバック
+- 音声カタログが壊れている場合は fallback に倒す
+- GitHub Pages の base path に対応
+
+音声素材を差し替える場合は、ファイルを `public/audio/` に置き、`public/data/audio_assets.json` を更新します。
+
+---
+
+## 11. データファイル
+
+### 11.1 ジャッジカード
+
+`public/data/judges.json`
+
+```json
+{
+  "version": 1,
+  "type": "judge",
+  "cards": []
+}
 ```
 
-✅ クラスのフィールドに `$state` を書く（`.svelte.ts` 拡張子必須）:
+読み込み:
+
+- `src/lib/scorer/judges.ts`
+
+### 11.2 GM メッセージ
+
+`public/data/gm_messages.json`
+
+version 2 は、各メッセージを文字列または文字列配列で書けます。
+
+### 11.3 音声カタログ
+
+`public/data/audio_assets.json`
+
+version 1 です。`src/lib/audio/assets.ts` の `parseAudioAssets` と同期してください。
+
+---
+
+## 12. GitHub Pages と base path
+
+`vite.config.js` で base path を切り替えます。
+
+```js
+base: process.env.VITE_BASE_PATH || '/'
+```
+
+GitHub Actions では次を渡しています。
+
+```text
+VITE_BASE_PATH=/atodashi-judge-scorer/
+```
+
+コード内で public asset を読むときは、必ず `import.meta.env.BASE_URL` を使ってください。`/data/...` のような絶対パスにすると、GitHub Pages のサブパスで壊れます。
+
+---
+
+## 13. 開発コマンド
+
+```bash
+npm install
+npm run dev
+npm run check
+npm run test
+npm run build
+```
+
+同じ Wi-Fi 上のスマホから確認する場合:
+
+```bash
+npm run dev -- --host 0.0.0.0 --port 5174
+```
+
+PowerShell で本番 base path を確認する場合:
+
+```powershell
+$env:VITE_BASE_PATH="/atodashi-judge-scorer/"
+npm run build
+npx vite preview
+```
+
+---
+
+## 14. 現在の検証状態
+
+2026-04-28 時点の確認結果:
+
+- `npm run check`: 0 errors / 0 warnings
+- `npm run test`: 4 files, 44 tests passed
+- `npm run build`: 成功
+
+ビルドサイズ:
+
+```text
+dist/index.html                  0.47 kB, gzip 0.33 kB
+dist/assets/index-*.css          31.40 kB, gzip 7.47 kB
+dist/assets/index-*.js           95.08 kB, gzip 32.67 kB
+```
+
+---
+
+## 15. テスト構成
+
+テストは 4 ファイル、44 ケースです。
+
+- `src/lib/scorer/session.test.ts`
+  - フェーズ遷移
+  - 採点ロジック
+  - 親ローテ
+  - 3択ジャッジ
+  - themeId
+  - タイマー連携
+  - snapshot 復元
+  - reset
+  - standings / rankedStandings
+- `src/lib/scorer/timer.test.ts`
+  - start / tick / expired / stop
+  - イベント購読
+  - fake timers
+  - snapshot 復元
+- `src/lib/scorer/gmMessages.test.ts`
+  - テンプレート置換
+  - フェーズ別メッセージ
+  - v1 / v2 JSON 互換
+  - fallback
+- `src/lib/audio/assets.test.ts`
+  - 音声カタログ parse
+  - 音量 clamp
+  - loader URL
+
+採点ロジックを触る場合は、旧 Python 実装のテストと数値がズレないように確認してください。
+
+---
+
+## 16. Svelte 5 の注意点
+
+### 16.1 クラス state は `.svelte.ts` に置く
+
+`ScoreSession` や `CountdownTimer` は、クラスフィールドに `$state` を持っています。
+
 ```ts
-// session.svelte.ts
 export class ScoreSession {
   phase: Phase = $state(Phase.Setup)
-  // ...
 }
-
-// .svelte ファイル
-let session = new ScoreSession()  // $state でラップしない
 ```
 
-→ vitest でも `.svelte.ts` を扱うため、`vitest.config.ts` に `@sveltejs/vite-plugin-svelte` を入れている。
+この書き方には `.svelte.ts` 拡張子が必要です。
 
-### 8.2 `Map` は `$state` の deep proxy で観測されない
+### 16.2 `new ScoreSession()` を `$state(...)` で包まない
 
-`Map.set()` のミューテーションは Svelte の deep proxy が拾わない。本リポジトリでは `Record<number, number>`（POJO）で代用している（`IdMap` 型）。`Map` を使うなら `svelte/reactivity` の `SvelteMap` を使うこと。
+次のように包むと、クラス内部の変更が期待通り UI に反映されません。
 
-### 8.3 `verbatimModuleSyntax: true` の TypeScript 設定
-
-型 import は必ず `import type { ... }` と書く。値とまぜて書けない:
 ```ts
-// ❌ NG
-import { Phase, type Player } from '../types'  // 一部環境で警告
-// ✅ OK
+let session = $state(new ScoreSession())
+```
+
+現在の正しい形:
+
+```ts
+let session = new ScoreSession()
+```
+
+### 16.3 `Map.set()` は deep proxy で拾われない
+
+判断入力や得点差分は `Record<number, number>` の `IdMap` を使っています。`Map` に戻す場合は `svelte/reactivity` の `SvelteMap` を検討してください。
+
+### 16.4 型 import
+
+`verbatimModuleSyntax: true` のため、型は `import type` で分けてください。
+
+```ts
 import { Phase } from '../types'
 import type { Player } from '../types'
 ```
 
-### 8.4 GitHub Pages 用の `base` パス
+---
 
-`vite.config.js` で `base: process.env.VITE_BASE_PATH || '/'` としている。GH Actions では `/atodashi-judge-scorer/` を渡してビルドする。**fetch するときは必ず `import.meta.env.BASE_URL` を使う**（`src/lib/scorer/judges.ts` 参照）。
+## 17. コーディング方針
 
-### 8.5 PowerShell 5.1 環境
-
-開発ホストは Windows / PowerShell 5.1（bash も併用可）。`&&` は使えない。シェルコマンドを書く際は `;` + `if ($?)` を使うか、bash で書く。
+- ロジックは `src/lib/scorer/` に寄せる
+- UI は `src/components/` に分ける
+- カード管理は増やさず、物理カード前提を守る
+- fetch は `import.meta.env.BASE_URL` 経由にする
+- localStorage から読む値は必ず parse / validate する
+- 採点ロジック変更時はテストを先に読む
+- `.svelte.ts` の runes まわりを普通の `.ts` に移動しない
+- GitHub Pages での動作を意識する
 
 ---
 
-## 9. テスト
+## 18. 既知の制限と今後の候補
 
-```bash
-npm run test       # vitest run
-npm run test:watch # ウォッチモード
-```
+現在の既知制限:
 
-現在 **23 ケース全 pass**:
+- フェーズを戻す Undo は未実装
+- ラウンド履歴は `session.history` にあるが、振り返り画面は未実装
+- localStorage はブラウザ単位。複数端末同期はしない
+- 音声はブラウザの自動再生制限を受ける
+- プレイヤー人数は 3〜8人固定
+- ジャッジカードは Web 側では `judges.json` のみ。シチュエーションやアイテムは持たない
 
-- `src/lib/scorer/session.test.ts` (13 ケース)
-  - `test_scorer_session.py` の関連ケースを移植したもの
-  - プレイヤー人数バリデーション、フェーズ遷移、採点数値一致、親ローテ、3 択判断、`rankedStandings` 同順位パターン 3 種、Timer 連携 2 種
-- `src/lib/scorer/timer.test.ts` (8 ケース)
-  - CountdownTimer の start/tick/expired/stop/event listener、`vi.useFakeTimers` での実 setInterval 検証
+今後の拡張候補:
 
-採点ロジックの数値整合は **Python 側のテストと完全一致**するよう書かれている。ロジック変更時は必ず双方を見て差分が出ないようにする。
-
----
-
-## 10. ビルド・デプロイ
-
-```bash
-npm run dev       # 開発: http://localhost:5173/
-npm run check     # 型チェック (svelte-check)
-npm run test      # vitest
-npm run build     # 本番ビルド (dist/)
-npm run preview   # build 結果のローカル確認
-```
-
-GitHub Pages へのデプロイは `main` への push で自動。`.github/workflows/` 配下を参照。
-
-現在のビルドサイズ: **JS 63 KB / gzip 22.5 KB**（目標 < 100 KB を満たす）。
+- Undo / 1 フェーズ戻る
+- ラウンド履歴の振り返り画面
+- テストプレイ後の得点バランス調整
+- 高校生テストプレイ用の説明文や簡易モード
+- 端末サイズ別の実機 UI 調整
+- 音声素材の差し替え、追加
 
 ---
 
-## 11. コーディング規約・スタイル
+## 19. 開発を再開するとき
 
-- **TypeScript**: `strict: true`、`noUncheckedIndexedAccess` 相当（配列アクセスで `?` を意識）
-- **コンポーネント**: `<script lang="ts">` 必須。props は `let { x }: Props = $props()` 形式
-- **rune の使い方**:
-  - `$state` で reactive な可変値
-  - `$derived` で算出値（`$derived.by(() => ...)` も併用）
-  - `$props` で受け取り。コールバックも prop として渡す（custom events ではなく）
-- **クラスで state**: 必ず `.svelte.ts` ファイルに置き、フィールドに `$state(...)` を書く
-- **エラー表示**: ScoreSession の `throw` は App.svelte の `safe(() => ...)` ラッパで `runError` に変換、上部に黄色のバナーで表示
-- **スタイル**: Tailwind ユーティリティ。ダークグラデ + 紫アクセント (`bg-purple-500` 系) + emerald(成功) / amber(警告) / red(エラー) で統一
-- **タップターゲット**: 判断ボタンは `min-h-[56px]`、卓上で誤タップしないサイズ
-- **コメント**: 設計意図や Python 側との対応を残す。「なぜそう書いたか」を優先
+最初に見る場所:
 
----
+1. `git status --short`
+2. `npm run check`
+3. `npm run test`
+4. `src/App.svelte`
+5. `src/lib/scorer/session.svelte.ts`
+6. 変更したい画面に対応する `src/components/*.svelte`
 
-## 12. 残作業 / 将来の拡張
+データや素材だけ変えたい場合:
 
-### 進行中（現状ブランチに未コミットの変更あり）
-直近の追加機能（タイマー / 検索 / 同順位）はまだ commit されていない。`git status`:
-```
-modified:   src/App.svelte
-modified:   src/components/GameOver.svelte
-modified:   src/components/JudgeSelect.svelte
-modified:   src/components/Setup.svelte
-modified:   src/lib/scorer/session.svelte.ts
-modified:   src/lib/scorer/session.test.ts
-modified:   src/lib/types.ts
-new file:   src/components/TimerDisplay.svelte
-new file:   src/lib/scorer/timer.svelte.ts
-new file:   src/lib/scorer/timer.test.ts
-new file:   HANDOFF.md  (このファイル)
-```
-ユーザー（オーナー）が手動で commit / push する流儀。
+1. `public/data/*.json`
+2. `public/audio/`
+3. `public/GM_icon/`
 
-### スコープ外（将来やる）
-- **タイマー音再生**: `timer.on('expired', ...)` のフックは用意済み。あとは `Audio` を流すだけ
-- **ラウンド履歴の振り返り画面**: `session.history` に各 RoundState が積まれている
-- **Undo / 入力ミス修正**: 同フェーズ内なら option を押し直せるが、フェーズを戻すのは未実装
-- **localStorage 永続化**: リロード復帰
-- **アニメーション・効果音**（タイマー音以外）・トランジション
-- **同点時のタイブレーク**: 現状は同順位のまま終了
-
-### 既知の制限
-- judges.json は 12 枚固定（Python 側と同期）。追加したい場合は両方を更新
-- プレイヤー人数 2〜6 人。これ以上増やすには `MIN_PLAYERS` / `MAX_PLAYERS` 定数の見直し
+大きめの UI 変更をする場合は、スマホ幅とタブレット幅で必ず確認してください。このアプリは卓上で複数人が覗き込む前提なので、ボタンの大きさ、前回判断の見やすさ、GM 表示の邪魔にならなさが重要です。
 
 ---
 
-## 13. 開発を進めるときに最初にすること
+## 20. ユーザー対応メモ
 
-1. `npm install` で依存をインストール
-2. `npm run check && npm run test` で全部通るか確認（**通らない状態でいきなり編集しない**）
-3. `npm run dev` でブラウザ確認しながら作業
-4. 採点ロジック変更時は **必ず** Python 側 (`atodashi_judge/game.py` と `tests/test_scorer_session.py`) を比較し、テスト数値が一致するよう保つ
-5. UI を変えるときは memory の方針（卓上 scoreboard、シチュ/アイテム持たない、見栄え重視）と矛盾しないか毎回確認
+ユーザーは Python やロジック設計には強い一方、Web フロントエンドやデプロイ周りは前提を省かず説明した方がよいです。
 
----
-
-## 14. ユーザー対応のヒント
-
-- フロントエンド/Web インフラの説明では略語や前提を省略せず、「これは○○という概念です」と一段かみ砕く
-- Python 側の設計議論はエンジニア前提で OK（ステートマシンの分離など、ロジック設計力は高い）
-- コミット & プッシュはユーザー側で実施する流儀（AI 側からは原則 commit しない）
-- 大きな変更を始める前に **AskUserQuestion** で確認するか、`/loop` の plan モードで方針を固めると安全
-
----
-
-## 15. 関連リンク
-
-- **本リポジトリ**: https://github.com/Puni777/atodashi-judge-scorer
-- **公開版**: https://puni777.github.io/atodashi-judge-scorer/
-- **Svelte 5 docs**: https://svelte.dev/docs/svelte/overview
-- **Tailwind CSS v4**: https://tailwindcss.com/docs/installation/using-vite
-- **vitest**: https://vitest.dev/
-
-何か不明点があればコードコメントを優先的に読み、それでも不明ならユーザーに直接確認すること。**「動いてるからヨシ」ではなく「ロジック数値が Python と一致しているか」「memory の方針からズレていないか」を都度チェック**するのがこのプロジェクトの肝。
+- Svelte / Vite / GitHub Pages の話は一段かみ砕く
+- 採点ロジックや状態遷移の話はエンジニア前提でよい
+- コミットと push はユーザーが手動で行う流儀
+- 迷ったら「スコアラーは軽く、物理カードを主役にする」方針に戻る
