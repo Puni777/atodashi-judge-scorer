@@ -59,6 +59,7 @@
   let optionsOpen = $state(false)
   let floatingGmHeight = $state(0)
   let floatingGmTyping = $state(false)
+  let floatingGmTypingKey: string | null = null
   let previousAudioPhase: Phase = Phase.Setup
   let alarmPlayedForCurrentFinal = false
 
@@ -206,6 +207,10 @@
     if (!floatingGmRendered) {
       floatingGmHeight = 0
       floatingGmTyping = false
+      if (floatingGmTypingKey) {
+        floatingGmAnimatedMessageKeys.add(floatingGmTypingKey)
+        floatingGmTypingKey = null
+      }
     }
   })
 
@@ -446,10 +451,16 @@
   }
 
   function handleFloatingGmTypingChange(typing: boolean) {
+    const previousTypingKey = floatingGmTypingKey
     floatingGmTyping = typing
-    if (typing && gmMessageKey.length > 0) {
-      floatingGmAnimatedMessageKeys.add(gmMessageKey)
+    if (typing) {
+      floatingGmTypingKey = gmMessageKey.length > 0 ? gmMessageKey : null
+      return
     }
+    if (previousTypingKey) {
+      floatingGmAnimatedMessageKeys.add(previousTypingKey)
+    }
+    floatingGmTypingKey = null
   }
 
   function gmMessageToAnimationKey(value: string[] | string): string {

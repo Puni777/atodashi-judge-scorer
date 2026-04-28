@@ -851,6 +851,25 @@ button, input {
   gap: 0.75rem;
 }
 
+.gm-guide:not(.gm-guide-floating) {
+  overflow-anchor: none;
+}
+
+.gm-guide:not(.gm-guide-floating) .gm-bubble {
+  display: flex;
+  flex-direction: column;
+  height: clamp(8.75rem, 22vh, 10.5rem);
+  overflow: visible;
+}
+
+.gm-guide:not(.gm-guide-floating) .gm-message {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+  scrollbar-gutter: stable;
+}
+
 .app-shell-floating-gm {
   padding-bottom: calc(var(--floating-gm-height, 0px) + 2rem + env(safe-area-inset-bottom));
   scroll-padding-bottom: calc(var(--floating-gm-height, 0px) + 2rem + env(safe-area-inset-bottom));
@@ -1157,6 +1176,10 @@ button, input {
   .gm-bubble {
     min-height: 4.75rem;
     padding: 0.75rem 0.85rem;
+  }
+
+  .gm-guide:not(.gm-guide-floating) .gm-bubble {
+    height: clamp(7.75rem, 24vh, 9.25rem);
   }
 
   .gm-guide-floating .gm-bubble {
