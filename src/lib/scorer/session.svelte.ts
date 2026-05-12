@@ -185,6 +185,18 @@ export class ScoreSession {
     return deltas
   }
 
+  skipFinalJudgment(): IdMap {
+    this.requireRound()
+    if (!this.canSkipFinalJudgment()) {
+      throw new Error('第2判断が全員一致している場合のみスキップできます')
+    }
+    this.roundState!.finalJudgments = { ...this.roundState!.secondJudgments }
+    const deltas = this.scoreRound(this.roundState!)
+    this.phase = Phase.RoundScore
+    this.timer.stop()
+    return deltas
+  }
+
   nextRound(): void {
     this.requireRound()
     this.history.push(this.roundState!)
@@ -316,6 +328,16 @@ export class ScoreSession {
   allFinalSubmitted(): boolean {
     this.requireRound()
     return Object.keys(this.roundState!.finalJudgments).length === this.children().length
+  }
+
+  canSkipFinalJudgment(): boolean {
+    this.requireRound()
+    if (!this.allSecondSubmitted()) return false
+    const childIds = this.children().map((c) => c.id)
+    const [firstChildId] = childIds
+    if (firstChildId === undefined) return false
+    const firstOption = this.roundState!.secondJudgments[firstChildId]
+    return childIds.every((id) => this.roundState!.secondJudgments[id] === firstOption)
   }
 
   // ---- 内部 --------------------------------------------------------------

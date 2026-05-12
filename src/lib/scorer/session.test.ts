@@ -113,6 +113,73 @@ describe('ScoreSession', () => {
     expect(() => s.advanceToSecond()).toThrow()
   })
 
+  it('第2判断が未入力または割れている場合は最終判断をスキップできない', () => {
+    const s = new ScoreSession()
+    start(s)
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b, c] = s.children()
+    if (!b || !c) throw new Error('children should exist')
+
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 0)
+    s.advanceToSecond()
+    expect(s.canSkipFinalJudgment()).toBe(false)
+    expect(() => s.skipFinalJudgment()).toThrow()
+
+    s.submitSecond(b.id, 0)
+    s.submitSecond(c.id, 1)
+    expect(s.canSkipFinalJudgment()).toBe(false)
+    expect(() => s.skipFinalJudgment()).toThrow()
+  })
+
+  it('2択で第2判断が全員一致なら最終判断を第2判断で埋めて採点する', () => {
+    const s = new ScoreSession()
+    start(s)
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b, c] = s.children()
+    if (!b || !c) throw new Error('children should exist')
+
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 1)
+    s.advanceToSecond()
+    s.submitSecond(b.id, 1)
+    s.submitSecond(c.id, 1)
+
+    expect(s.canSkipFinalJudgment()).toBe(true)
+    const deltas = s.skipFinalJudgment()
+
+    expect(s.phase).toBe(Phase.RoundScore)
+    expect(s.roundState?.finalJudgments).toEqual({ [b.id]: 1, [c.id]: 1 })
+    expect(deltas[s.parent().id]).toBe(1)
+    expect(deltas[b.id]).toBe(0)
+    expect(deltas[c.id]).toBe(0)
+  })
+
+  it('3択でも第2判断が全員同じ option なら最終判断をスキップできる', () => {
+    const s = new ScoreSession()
+    start(s)
+    s.enterParentSetup()
+    s.setJudge(JUDGE_3OPT)
+    s.enterFirstJudgment()
+    const [b, c] = s.children()
+    if (!b || !c) throw new Error('children should exist')
+
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 1)
+    s.advanceToSecond()
+    s.submitSecond(b.id, 2)
+    s.submitSecond(c.id, 2)
+
+    expect(s.canSkipFinalJudgment()).toBe(true)
+    s.skipFinalJudgment()
+    expect(s.phase).toBe(Phase.RoundScore)
+    expect(s.roundState?.finalJudgments).toEqual({ [b.id]: 2, [c.id]: 2 })
+  })
+
   it('親が A→B→C と正しくローテし、3 ラウンドで GameOver', () => {
     const s = new ScoreSession()
     start(s, ['A', 'B', 'C'], { totalRounds: 3, timerSeconds: 0 })

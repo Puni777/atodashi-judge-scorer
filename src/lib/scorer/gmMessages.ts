@@ -11,6 +11,10 @@ export type GmJudgmentMessages = {
   complete: GmMessageSequence
 }
 
+export type GmSecondJudgmentMessages = GmJudgmentMessages & {
+  unanimous?: GmMessageSequence
+}
+
 export type GmFinalJudgmentMessages = GmJudgmentMessages & {
   expired: GmMessageSequence
 }
@@ -20,7 +24,7 @@ export type GmMessages = {
   roundStart: GmMessageSequence
   parentSetup: GmMessageSequence
   firstJudgment: GmJudgmentMessages
-  secondJudgment: GmJudgmentMessages
+  secondJudgment: GmSecondJudgmentMessages
   finalJudgment: GmFinalJudgmentMessages
   roundScore: GmMessageSequence
   gameOver: GmMessageSequence
@@ -73,6 +77,10 @@ export const fallbackGmMessages: GmMessages = {
       'ここからは話し合いの時間です！',
       '子のみんなもアイテムカードを出して反論できますよ。',
       '自分の判断が正しいことを、理由とアイテムで証明しましょう。',
+    ],
+    unanimous: [
+      '第2判断が全員一致しました！',
+      'このラウンドは最終判断をスキップして採点できます。',
     ],
   },
   finalJudgment: {
@@ -128,7 +136,7 @@ export function getGmMessage(messages: GmMessages, session: ScoreSession): strin
     case Phase.FirstJudgment:
       return judgmentMessage(messages.firstJudgment, session.roundState?.firstJudgments, values)
     case Phase.SecondJudgment:
-      return judgmentMessage(messages.secondJudgment, session.roundState?.secondJudgments, values)
+      return secondJudgmentMessage(messages.secondJudgment, session, values)
     case Phase.FinalJudgment:
       if (session.timer.expired) {
         return renderSequence(messages.finalJudgment.expired, values)
@@ -168,7 +176,7 @@ export function parseGmMessagesFile(value: unknown): GmMessages | null {
   const roundScore = asMessageSequence(messages.roundScore)
   const gameOver = asMessageSequence(messages.gameOver)
   const firstJudgment = parseJudgmentMessages(messages.firstJudgment)
-  const secondJudgment = parseJudgmentMessages(messages.secondJudgment)
+  const secondJudgment = parseSecondJudgmentMessages(messages.secondJudgment)
   const finalJudgment = parseFinalJudgmentMessages(messages.finalJudgment)
 
   if (
@@ -208,10 +216,29 @@ function judgmentMessage(
   return renderSequence(messages[key], { ...values, done, total, remaining })
 }
 
+function secondJudgmentMessage(
+  messages: GmSecondJudgmentMessages,
+  session: ScoreSession,
+  values: TemplateValues,
+): string[] {
+  if (safeCanSkipFinalJudgment(session) && messages.unanimous) {
+    return renderSequence(messages.unanimous, values)
+  }
+  return judgmentMessage(messages, session.roundState?.secondJudgments, values)
+}
+
 function progressKey(done: number, total: number): keyof GmJudgmentMessages {
   if (done <= 0) return 'empty'
   if (total > 0 && done >= total) return 'complete'
   return 'progress'
+}
+
+function safeCanSkipFinalJudgment(session: ScoreSession): boolean {
+  try {
+    return session.canSkipFinalJudgment()
+  } catch {
+    return false
+  }
 }
 
 function baseTemplateValues(session: ScoreSession): TemplateValues {
@@ -262,6 +289,15 @@ function parseJudgmentMessages(value: unknown): GmJudgmentMessages | null {
   const complete = asMessageSequence(obj.complete)
   if (empty === null || progress === null || complete === null) return null
   return { empty, progress, complete }
+}
+
+function parseSecondJudgmentMessages(value: unknown): GmSecondJudgmentMessages | null {
+  const base = parseJudgmentMessages(value)
+  const obj = asRecord(value)
+  if (!base || !obj) return null
+  const unanimous = obj.unanimous === undefined ? undefined : asMessageSequence(obj.unanimous)
+  if (unanimous === null) return null
+  return unanimous === undefined ? base : { ...base, unanimous }
 }
 
 function parseFinalJudgmentMessages(value: unknown): GmFinalJudgmentMessages | null {

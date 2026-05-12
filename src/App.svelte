@@ -273,6 +273,10 @@
     safe(() => session.advanceToFinal())
   }
 
+  function handleSkipFinalJudgment() {
+    safe(() => session.skipFinalJudgment())
+  }
+
   function handleFinalize() {
     safe(() => session.finalizeRound())
   }
@@ -469,6 +473,9 @@
 
   let totalRounds = $derived(session.config.totalRounds ?? session.players.length)
   let isLastRound = $derived(session.roundIndex + 1 >= totalRounds)
+  let canSkipFinalJudgment = $derived(
+    session.phase === Phase.SecondJudgment && session.roundState !== null && session.canSkipFinalJudgment(),
+  )
   let gmMessage = $derived(getGmMessage(gmMessages, session))
   let gmMessageKey = $derived(gmMessageToAnimationKey(gmMessage))
   let floatingGmRendered = $derived(
@@ -595,10 +602,12 @@
           currentJudgments={session.roundState.secondJudgments}
           prevJudgments={session.roundState.firstJudgments}
           prevLabel="第1"
-          hint="親がアイテムを追加したあと、もう一度判断してください"
-          advanceLabel="話し合い → 次へ"
+          hint={canSkipFinalJudgment
+            ? '第2判断が全員一致しました。最終判断をスキップできます。'
+            : '親がアイテムを追加したあと、もう一度判断してください'}
+          advanceLabel={canSkipFinalJudgment ? '全員一致のためスキップして採点' : '話し合い → 次へ'}
           onSelect={handleSubmitSecond}
-          onAdvance={handleAdvanceToFinal}
+          onAdvance={canSkipFinalJudgment ? handleSkipFinalJudgment : handleAdvanceToFinal}
         />
       {:else if session.phase === Phase.FinalJudgment && session.roundState?.judge}
         <TimerDisplay timer={session.timer} />

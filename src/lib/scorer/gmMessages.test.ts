@@ -142,6 +142,26 @@ describe('GM message rendering', () => {
     expect(getGmMessage(fallbackGmMessages, session).length).toBeGreaterThan(0)
   })
 
+  it('第2判断が全員一致したら unanimous を返し、未定義なら complete に倒れる', () => {
+    const session = startSession()
+    enterSecond(session)
+    for (const child of session.children()) session.submitSecond(child.id, 0)
+
+    expect(getGmMessage(fallbackGmMessages, session)).toEqual(
+      asArray(fallbackGmMessages.secondJudgment.unanimous!),
+    )
+
+    const legacyMessages: GmMessages = {
+      ...fallbackGmMessages,
+      secondJudgment: {
+        empty: '第2判断',
+        progress: 'progress',
+        complete: 'complete',
+      },
+    }
+    expect(getGmMessage(legacyMessages, session)).toEqual(['complete'])
+  })
+
   it('最終判断の empty / progress / complete / expired を返す', () => {
     const session = startSession()
     enterFinal(session)
