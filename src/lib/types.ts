@@ -31,6 +31,20 @@ export enum Phase {
  *  Svelte 5 の `$state` deep proxy が Map のミューテーションを観測してくれないため。 */
 export type IdMap = Record<number, number>
 
+export type ScoreBreakdownKind = 'parent' | 'child'
+
+export type PlayerScoreBreakdown = {
+  kind: ScoreBreakdownKind
+  firstToSecond: number
+  secondToFinal: number
+  pullCount: number
+  pullPoints: number
+  updatePoints: number
+  total: number
+}
+
+export type ScoreBreakdownMap = Record<number, PlayerScoreBreakdown>
+
 export type RoundState = {
   parentId: number
   judge: JudgeCard | null
@@ -38,6 +52,7 @@ export type RoundState = {
   secondJudgments: IdMap
   finalJudgments: IdMap
   scoreDelta: IdMap
+  scoreBreakdown: ScoreBreakdownMap
 }
 
 export const THEME_OPTIONS = [

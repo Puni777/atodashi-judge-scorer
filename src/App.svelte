@@ -628,6 +628,7 @@
           players={session.players}
           parentId={session.roundState.parentId}
           deltas={session.roundState.scoreDelta}
+          breakdowns={session.roundState.scoreBreakdown}
           {isLastRound}
           onNext={handleNextRound}
         />

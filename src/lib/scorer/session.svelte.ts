@@ -1,8 +1,7 @@
 /**
  * 後出しジャッジ scorer の状態機械（UI 非依存）。
  *
- * 旧 Python 実装 `atodashi_judge/scorer/session.py` + `game.py` の以下のロジックを
- * 物理カード前提（手札・デッキなし）に絞って TS 移植したもの。
+ * 物理カード前提（手札・デッキなし）に絞ったスコアラー用ロジック。
  *
  *   - 親ローテ（roundIndex % players.length）
  *   - 1st/2nd/最終 判断の入力と前提チェック
@@ -10,7 +9,15 @@
  *   - フェーズ遷移
  */
 import { Phase, DEFAULT_TIMER_SECONDS, DEFAULT_THEME_ID, THEME_OPTIONS } from '../types'
-import type { JudgeCard, Player, RoundState, ScorerConfig, IdMap } from '../types'
+import type {
+  JudgeCard,
+  Player,
+  PlayerScoreBreakdown,
+  RoundState,
+  ScoreBreakdownMap,
+  ScorerConfig,
+  IdMap,
+} from '../types'
 import { CountdownTimer } from './timer.svelte'
 import type { CountdownTimerSnapshot } from './timer.svelte'
 
@@ -58,6 +65,7 @@ function emptyRoundState(parentId: number): RoundState {
     secondJudgments: {},
     finalJudgments: {},
     scoreDelta: {},
+    scoreBreakdown: {},
   }
 }
 
@@ -220,9 +228,10 @@ export class ScoreSession {
    *   - 第一→第二 で判断が変わった子の人数（+）
    *   - 第二→最終 で判断が変わった子の人数（+）
    *
-   * 子（第二==最終 の者のみ）:
-   *   - 他の子のうち「第二→最終 で変え、かつ最終が自分の最終と一致」する人数
-   *   第二→最終 で判断を変えた子は 0 点。
+   * 子:
+   *   - 第二→最終 で判断を変えた子は更新点 1 点
+   *   - 第二→最終 で据え置いた子は、他の子のうち
+   *     「第二→最終 で変え、かつ最終が自分の最終と一致」する人数 × 2 点
    */
   private scoreRound(state: RoundState): IdMap {
     const childIds = this.children().map((c) => c.id)
@@ -236,6 +245,10 @@ export class ScoreSession {
 
     const deltas: IdMap = {}
     for (const p of this.players) deltas[p.id] = 0
+    const scoreBreakdown: ScoreBreakdownMap = {}
+    for (const p of this.players) {
+      scoreBreakdown[p.id] = emptyScoreBreakdown(p.id === state.parentId ? 'parent' : 'child')
+    }
 
     const shiftedOnSecond = childIds.filter(
       (c) => state.secondJudgments[c] !== state.firstJudgments[c],
@@ -243,11 +256,23 @@ export class ScoreSession {
     const shiftedOnFinal = childIds.filter(
       (c) => state.finalJudgments[c] !== state.secondJudgments[c],
     ).length
-    deltas[state.parentId] = shiftedOnSecond + shiftedOnFinal
+    const parentTotal = shiftedOnSecond + shiftedOnFinal
+    deltas[state.parentId] = parentTotal
+    scoreBreakdown[state.parentId] = {
+      ...emptyScoreBreakdown('parent'),
+      firstToSecond: shiftedOnSecond,
+      secondToFinal: shiftedOnFinal,
+      total: parentTotal,
+    }
 
     for (const c of childIds) {
       if (state.finalJudgments[c] !== state.secondJudgments[c]) {
-        deltas[c] = 0
+        deltas[c] = 1
+        scoreBreakdown[c] = {
+          ...emptyScoreBreakdown('child'),
+          updatePoints: 1,
+          total: 1,
+        }
         continue
       }
       const pulled = childIds.filter(
@@ -256,10 +281,18 @@ export class ScoreSession {
           state.finalJudgments[o] !== state.secondJudgments[o] &&
           state.finalJudgments[o] === state.finalJudgments[c],
       ).length
-      deltas[c] = pulled
+      const pullPoints = pulled * 2
+      deltas[c] = pullPoints
+      scoreBreakdown[c] = {
+        ...emptyScoreBreakdown('child'),
+        pullCount: pulled,
+        pullPoints,
+        total: pullPoints,
+      }
     }
 
     state.scoreDelta = deltas
+    state.scoreBreakdown = scoreBreakdown
     for (const p of this.players) {
       p.score += deltas[p.id] ?? 0
     }
@@ -410,6 +443,26 @@ function cloneIdMap(map: IdMap): IdMap {
   return { ...map }
 }
 
+function emptyScoreBreakdown(kind: PlayerScoreBreakdown['kind']): PlayerScoreBreakdown {
+  return {
+    kind,
+    firstToSecond: 0,
+    secondToFinal: 0,
+    pullCount: 0,
+    pullPoints: 0,
+    updatePoints: 0,
+    total: 0,
+  }
+}
+
+function cloneScoreBreakdownMap(map: ScoreBreakdownMap): ScoreBreakdownMap {
+  const result: ScoreBreakdownMap = {}
+  for (const [id, breakdown] of Object.entries(map)) {
+    result[Number(id)] = { ...breakdown }
+  }
+  return result
+}
+
 function cloneRoundState(state: RoundState | null): RoundState | null {
   if (state === null) return null
   return {
@@ -419,6 +472,7 @@ function cloneRoundState(state: RoundState | null): RoundState | null {
     secondJudgments: cloneIdMap(state.secondJudgments),
     finalJudgments: cloneIdMap(state.finalJudgments),
     scoreDelta: cloneIdMap(state.scoreDelta),
+    scoreBreakdown: cloneScoreBreakdownMap(state.scoreBreakdown),
   }
 }
 
@@ -488,9 +542,13 @@ function parseRoundState(value: unknown): RoundState | null {
   const secondJudgments = parseIdMap(obj.secondJudgments)
   const finalJudgments = parseIdMap(obj.finalJudgments)
   const scoreDelta = parseIdMap(obj.scoreDelta)
+  const scoreBreakdown = obj.scoreBreakdown === undefined
+    ? null
+    : parseScoreBreakdownMap(obj.scoreBreakdown)
   if (judge === undefined || !firstJudgments || !secondJudgments || !finalJudgments || !scoreDelta) {
     return null
   }
+  if (obj.scoreBreakdown !== undefined && !scoreBreakdown) return null
   return {
     parentId: obj.parentId,
     judge,
@@ -498,7 +556,63 @@ function parseRoundState(value: unknown): RoundState | null {
     secondJudgments,
     finalJudgments,
     scoreDelta,
+    scoreBreakdown: scoreBreakdown ?? fallbackScoreBreakdown(scoreDelta, obj.parentId),
   }
+}
+
+function fallbackScoreBreakdown(scoreDelta: IdMap, parentId: number): ScoreBreakdownMap {
+  const result: ScoreBreakdownMap = {}
+  for (const [key, total] of Object.entries(scoreDelta)) {
+    const id = Number(key)
+    const kind = id === parentId ? 'parent' : 'child'
+    result[id] = { ...emptyScoreBreakdown(kind), total }
+  }
+  return result
+}
+
+function parseScoreBreakdownMap(value: unknown): ScoreBreakdownMap | null {
+  const obj = asRecord(value)
+  if (!obj) return null
+  const result: ScoreBreakdownMap = {}
+  for (const [key, breakdown] of Object.entries(obj)) {
+    const id = Number(key)
+    const parsed = parseScoreBreakdown(breakdown)
+    if (!Number.isInteger(id) || !parsed) return null
+    result[id] = parsed
+  }
+  return result
+}
+
+function parseScoreBreakdown(value: unknown): PlayerScoreBreakdown | null {
+  const obj = asRecord(value)
+  if (!obj || !(obj.kind === 'parent' || obj.kind === 'child')) return null
+  const firstToSecond = asNonNegativeInteger(obj.firstToSecond)
+  const secondToFinal = asNonNegativeInteger(obj.secondToFinal)
+  const pullCount = asNonNegativeInteger(obj.pullCount)
+  const pullPoints = asNonNegativeInteger(obj.pullPoints)
+  const updatePoints = asNonNegativeInteger(obj.updatePoints)
+  const total = asNonNegativeInteger(obj.total)
+  if (
+    firstToSecond === null ||
+    secondToFinal === null ||
+    pullCount === null ||
+    pullPoints === null ||
+    updatePoints === null ||
+    total === null
+  ) return null
+  return {
+    kind: obj.kind,
+    firstToSecond,
+    secondToFinal,
+    pullCount,
+    pullPoints,
+    updatePoints,
+    total,
+  }
+}
+
+function asNonNegativeInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
 }
 
 function parseJudge(value: unknown): JudgeCard | undefined {

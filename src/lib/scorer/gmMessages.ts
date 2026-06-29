@@ -39,7 +39,7 @@ export const fallbackGmMessages: GmMessages = {
   setup: [
     'こんにちは！後出しジャッジへようこそ。',
     'まずは参加する人と、名前・ラウンド数・タイマーを決めましょう。',
-    '準備ができたら「ゲームスタート」を押してください！',
+    '準備ができたら、親の順番を決めてからスタートです！',
   ],
   roundStart: [
     'ラウンド {round}/{totalRounds} のはじまりです！',

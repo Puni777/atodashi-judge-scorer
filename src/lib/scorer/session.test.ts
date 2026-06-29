@@ -1,6 +1,5 @@
 /**
- * `tests/test_scorer_session.py` の関連ケースを vitest に移植したもの。
- * 数値が Python 実装と一致することを確認するのが目的。
+ * 後出しジャッジ scorer の状態遷移と採点ロジックを確認する。
  */
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_THEME_ID, Phase } from '../types'
@@ -33,6 +32,18 @@ function start(
   s.startGame(names, config)
 }
 
+function completeHeldRound(s: ScoreSession): void {
+  s.enterParentSetup()
+  s.setJudge(JUDGE_2OPT)
+  s.enterFirstJudgment()
+  for (const child of s.children()) s.submitFirst(child.id, 0)
+  s.advanceToSecond()
+  for (const child of s.children()) s.submitSecond(child.id, 0)
+  s.advanceToFinal()
+  for (const child of s.children()) s.submitFinal(child.id, 0)
+  s.finalizeRound()
+}
+
 describe('ScoreSession', () => {
   it('プレイヤー人数 2 / 9 はエラー、3 / 8 は有効', () => {
     expect(() => start(new ScoreSession(), ['A', 'B'])).toThrow()
@@ -52,15 +63,15 @@ describe('ScoreSession', () => {
     expect(s.parent().name).toBe('A')
   })
 
-  it('1 ラウンドの遷移と採点が Python と一致する', () => {
+  it('1 ラウンドの遷移と採点が新ルールと一致する', () => {
     /*
      * 親=A, 子=B/C
      * B: 1st=0 → 2nd=1 (flipped) → final=1 (held)
      * C: 1st=0 → 2nd=0 (held)    → final=1 (flipped)
      *
      * 親 A: 1st→2nd で 1 人, 2nd→final で 1 人 → 2 点
-     * 子 B: final == 2nd → 他の子のうち 2nd→final で変え final が一致 = C → 1 点
-     * 子 C: final ≠ 2nd → 0 点
+     * 子 B: final == 2nd → 引き込み 1 人 × 2 点 → 2 点
+     * 子 C: final ≠ 2nd → 更新点 1 点
      */
     const s = new ScoreSession()
     start(s)
@@ -92,13 +103,33 @@ describe('ScoreSession', () => {
 
     const parentId = s.parent().id
     expect(deltas[parentId]).toBe(2)
-    expect(deltas[b.id]).toBe(1)
-    expect(deltas[c.id]).toBe(0)
+    expect(deltas[b.id]).toBe(2)
+    expect(deltas[c.id]).toBe(1)
+    expect(s.roundState?.scoreBreakdown[parentId]).toMatchObject({
+      kind: 'parent',
+      firstToSecond: 1,
+      secondToFinal: 1,
+      total: 2,
+    })
+    expect(s.roundState?.scoreBreakdown[b.id]).toMatchObject({
+      kind: 'child',
+      pullCount: 1,
+      pullPoints: 2,
+      updatePoints: 0,
+      total: 2,
+    })
+    expect(s.roundState?.scoreBreakdown[c.id]).toMatchObject({
+      kind: 'child',
+      pullCount: 0,
+      pullPoints: 0,
+      updatePoints: 1,
+      total: 1,
+    })
 
     // 累計スコアにも反映されている
     expect(s.players.find((p) => p.id === parentId)!.score).toBe(2)
-    expect(s.players.find((p) => p.id === b.id)!.score).toBe(1)
-    expect(s.players.find((p) => p.id === c.id)!.score).toBe(0)
+    expect(s.players.find((p) => p.id === b.id)!.score).toBe(2)
+    expect(s.players.find((p) => p.id === c.id)!.score).toBe(1)
   })
 
   it('全員揃わないと advanceToSecond できない', () => {
@@ -157,6 +188,84 @@ describe('ScoreSession', () => {
     expect(deltas[s.parent().id]).toBe(1)
     expect(deltas[b.id]).toBe(0)
     expect(deltas[c.id]).toBe(0)
+    expect(s.roundState?.scoreBreakdown[b.id]).toMatchObject({
+      kind: 'child',
+      pullCount: 0,
+      pullPoints: 0,
+      updatePoints: 0,
+      total: 0,
+    })
+    expect(s.roundState?.scoreBreakdown[c.id]).toMatchObject({
+      kind: 'child',
+      pullCount: 0,
+      pullPoints: 0,
+      updatePoints: 0,
+      total: 0,
+    })
+  })
+
+  it('据え置いた子は引き込んだ人数 × 2 点を得る', () => {
+    const s = new ScoreSession()
+    start(s, ['A', 'B', 'C', 'D'])
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b, c, d] = s.children()
+    if (!b || !c || !d) throw new Error('children should exist')
+
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 0)
+    s.submitFirst(d.id, 0)
+    s.advanceToSecond()
+    s.submitSecond(b.id, 1)
+    s.submitSecond(c.id, 0)
+    s.submitSecond(d.id, 0)
+    s.advanceToFinal()
+    s.submitFinal(b.id, 1)
+    s.submitFinal(c.id, 1)
+    s.submitFinal(d.id, 1)
+    const deltas = s.finalizeRound()
+
+    expect(deltas[b.id]).toBe(4)
+    expect(deltas[c.id]).toBe(1)
+    expect(deltas[d.id]).toBe(1)
+    expect(s.roundState?.scoreBreakdown[b.id]).toMatchObject({
+      kind: 'child',
+      pullCount: 2,
+      pullPoints: 4,
+      updatePoints: 0,
+      total: 4,
+    })
+  })
+
+  it('第2判断から最終判断で変えた子は更新点 1 点のみを得る', () => {
+    const s = new ScoreSession()
+    start(s)
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b, c] = s.children()
+    if (!b || !c) throw new Error('children should exist')
+
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 1)
+    s.advanceToSecond()
+    s.submitSecond(b.id, 0)
+    s.submitSecond(c.id, 1)
+    s.advanceToFinal()
+    s.submitFinal(b.id, 1)
+    s.submitFinal(c.id, 1)
+    const deltas = s.finalizeRound()
+
+    expect(deltas[b.id]).toBe(1)
+    expect(deltas[c.id]).toBe(2)
+    expect(s.roundState?.scoreBreakdown[b.id]).toMatchObject({
+      kind: 'child',
+      pullCount: 0,
+      pullPoints: 0,
+      updatePoints: 1,
+      total: 1,
+    })
   })
 
   it('3択でも第2判断が全員同じ option なら最終判断をスキップできる', () => {
@@ -198,6 +307,19 @@ describe('ScoreSession', () => {
       s.nextRound()
     }
     expect(parents).toEqual(['A', 'B', 'C'])
+    expect(s.phase).toBe(Phase.GameOver)
+  })
+
+  it('startGame に渡した名前順で親がローテする', () => {
+    const s = new ScoreSession()
+    start(s, ['C', 'A', 'B'], { totalRounds: 3, timerSeconds: 0 })
+    const parents: string[] = []
+    for (let i = 0; i < 3; i++) {
+      parents.push(s.parent().name)
+      completeHeldRound(s)
+      s.nextRound()
+    }
+    expect(parents).toEqual(['C', 'A', 'B'])
     expect(s.phase).toBe(Phase.GameOver)
   })
 
@@ -320,6 +442,62 @@ describe('ScoreSession', () => {
     expect(restored.history).toEqual([])
     expect(restored.timer.isRunning).toBe(true)
     expect(restored.timer.remainingSeconds).toBe(45)
+  })
+
+  it('scoreBreakdown を snapshot に保存し、復元できる', () => {
+    const s = new ScoreSession(new CountdownTimer(noopScheduler))
+    start(s)
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b, c] = s.children()
+    if (!b || !c) throw new Error('children should exist')
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 0)
+    s.advanceToSecond()
+    s.submitSecond(b.id, 1)
+    s.submitSecond(c.id, 0)
+    s.advanceToFinal()
+    s.submitFinal(b.id, 1)
+    s.submitFinal(c.id, 1)
+    s.finalizeRound()
+
+    const snapshot = s.toSnapshot(1_000)
+    const parsed = parseScoreSessionSnapshot(JSON.parse(JSON.stringify(snapshot)))
+    expect(parsed?.roundState?.scoreBreakdown[b.id]).toMatchObject({
+      kind: 'child',
+      pullCount: 1,
+      pullPoints: 2,
+      updatePoints: 0,
+      total: 2,
+    })
+
+    const restored = new ScoreSession(new CountdownTimer(noopScheduler))
+    restored.restoreSnapshot(parsed!, 1_000)
+    expect(restored.roundState?.scoreBreakdown).toEqual(s.roundState?.scoreBreakdown)
+  })
+
+  it('scoreBreakdown がない旧 snapshot は scoreDelta から補完して読める', () => {
+    const s = new ScoreSession(new CountdownTimer(noopScheduler))
+    start(s)
+    completeHeldRound(s)
+    const raw = JSON.parse(JSON.stringify(s.toSnapshot(1_000))) as {
+      roundState?: { scoreBreakdown?: unknown }
+    }
+    if (!raw.roundState) throw new Error('roundState should exist')
+    delete raw.roundState.scoreBreakdown
+
+    const parsed = parseScoreSessionSnapshot(raw)
+    const roundState = parsed?.roundState
+    if (!roundState) throw new Error('roundState should be restored')
+    expect(roundState.scoreBreakdown[0]).toMatchObject({
+      kind: 'parent',
+      total: roundState.scoreDelta[0],
+    })
+    expect(roundState.scoreBreakdown[1]).toMatchObject({
+      kind: 'child',
+      total: roundState.scoreDelta[1],
+    })
   })
 
   it('期限切れのタイマーを snapshot から復元できる', () => {
