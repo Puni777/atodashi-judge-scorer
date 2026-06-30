@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte'
   import ArrowDown from 'lucide-svelte/icons/arrow-down'
   import ArrowUp from 'lucide-svelte/icons/arrow-up'
   import GripVertical from 'lucide-svelte/icons/grip-vertical'
+  import Shuffle from 'lucide-svelte/icons/shuffle'
   import type { ThemeId } from '../lib/types'
   import type { AudioLoadStatus } from '../lib/audio/audioManager'
+  import { shuffleParentOrder } from '../lib/scorer/parentOrder'
   import { DEFAULT_THEME_ID, DEFAULT_TIMER_SECONDS } from '../lib/types'
   import GameOptions from './GameOptions.svelte'
 
@@ -14,6 +17,11 @@
     totalRounds: number | null
     timerSeconds: number
   }
+
+  const SHUFFLE_PREVIEW_STEPS = 5
+  const SHUFFLE_PREVIEW_INTERVAL_MS = 90
+  const SHUFFLE_SETTLE_DELAY_MS = 170
+  const SHUFFLE_SETTLE_CLASS_MS = 260
 
   type Props = {
     onStart: (
@@ -74,6 +82,10 @@
   let parentOrder = $state<number[]>([])
   let draggingIndex = $state<number | null>(null)
   let draggingPlayerIndex = $state<number | null>(null)
+  let isShuffling = $state(false)
+  let shuffleSettled = $state(false)
+  let shuffleTick = $state(0)
+  let shuffleTimers: number[] = []
 
   function setCount(n: number) {
     count = n
@@ -112,6 +124,7 @@
   function goToParentOrder() {
     const next = buildPreparedSetup()
     if (!next) return
+    resetShuffleAnimation()
     const keepOrder =
       preparedSetup !== null &&
       sameNames(preparedSetup.names, next.names) &&
@@ -125,6 +138,7 @@
   }
 
   function backToBasic() {
+    resetShuffleAnimation()
     step = 'basic'
     error = ''
     draggingIndex = null
@@ -132,6 +146,7 @@
   }
 
   function submitOrderedStart() {
+    if (isShuffling) return
     const setup = preparedSetup
     if (!setup) {
       error = 'セットアップ内容を確認してください'
@@ -158,8 +173,67 @@
     return seen.size === total && order.every((index) => Number.isInteger(index) && index >= 0 && index < total)
   }
 
+  function clearShuffleTimers() {
+    for (const timer of shuffleTimers) window.clearTimeout(timer)
+    shuffleTimers = []
+  }
+
+  function resetShuffleAnimation() {
+    clearShuffleTimers()
+    isShuffling = false
+    shuffleSettled = false
+    shuffleTick = 0
+  }
+
+  function prefersReducedMotion(): boolean {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  }
+
+  function scheduleShuffleTimer(callback: () => void, delayMs: number) {
+    const timer = window.setTimeout(callback, delayMs)
+    shuffleTimers.push(timer)
+  }
+
+  function shuffleParentOrderWithAnimation() {
+    if (isShuffling || parentOrder.length <= 1) return
+
+    clearShuffleTimers()
+    const finalOrder = shuffleParentOrder(parentOrder)
+    draggingIndex = null
+    draggingPlayerIndex = null
+
+    if (prefersReducedMotion()) {
+      parentOrder = finalOrder
+      shuffleSettled = false
+      shuffleTick += 1
+      return
+    }
+
+    isShuffling = true
+    shuffleSettled = false
+    shuffleTick += 1
+
+    for (let stepIndex = 1; stepIndex <= SHUFFLE_PREVIEW_STEPS; stepIndex += 1) {
+      scheduleShuffleTimer(() => {
+        parentOrder = shuffleParentOrder(parentOrder)
+        shuffleTick += 1
+      }, stepIndex * SHUFFLE_PREVIEW_INTERVAL_MS)
+    }
+
+    scheduleShuffleTimer(() => {
+      parentOrder = finalOrder
+      isShuffling = false
+      shuffleSettled = true
+      shuffleTick += 1
+
+      scheduleShuffleTimer(() => {
+        shuffleSettled = false
+      }, SHUFFLE_SETTLE_CLASS_MS)
+    }, SHUFFLE_PREVIEW_STEPS * SHUFFLE_PREVIEW_INTERVAL_MS + SHUFFLE_SETTLE_DELAY_MS)
+  }
+
   function moveParentOrder(from: number, to: number) {
-    if (from === to || from < 0 || to < 0 || from >= parentOrder.length || to >= parentOrder.length) return
+    if (isShuffling || from === to || from < 0 || to < 0 || from >= parentOrder.length || to >= parentOrder.length) return
     const next = [...parentOrder]
     const [moved] = next.splice(from, 1)
     if (moved === undefined) return
@@ -173,6 +247,7 @@
   }
 
   function handleOrderPointerDown(event: PointerEvent, index: number, playerIndex: number) {
+    if (isShuffling) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
     const handle = event.currentTarget as HTMLElement
     handle.setPointerCapture(event.pointerId)
@@ -182,7 +257,7 @@
   }
 
   function handleOrderPointerMove(event: PointerEvent) {
-    if (draggingIndex === null) return
+    if (isShuffling || draggingIndex === null) return
     const element = document.elementFromPoint(event.clientX, event.clientY)
     const row = element instanceof Element
       ? (element.closest('[data-parent-order-index]') as HTMLElement | null)
@@ -200,6 +275,8 @@
     draggingIndex = null
     draggingPlayerIndex = null
   }
+
+  onDestroy(clearShuffleTimers)
 </script>
 
 <section class="ui-card p-6 space-y-5">
@@ -335,15 +412,33 @@
       <button
         type="button"
         onclick={backToBasic}
+        disabled={isShuffling}
         class="ui-button-secondary px-3 py-2 rounded-lg text-sm font-bold transition"
       >
         戻る
       </button>
     </div>
 
-    <div class="flex flex-wrap gap-2 text-xs">
-      <span class="ui-pill rounded-full px-3 py-1">ラウンド {preparedSetup.totalRounds ?? preparedSetup.names.length}</span>
-      <span class="ui-pill rounded-full px-3 py-1">人数 {preparedSetup.names.length}</span>
+    <div class="parent-order-toolbar">
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="ui-pill rounded-full px-3 py-1">ラウンド {preparedSetup.totalRounds ?? preparedSetup.names.length}</span>
+        <span class="ui-pill rounded-full px-3 py-1">人数 {preparedSetup.names.length}</span>
+      </div>
+      <button
+        type="button"
+        onclick={shuffleParentOrderWithAnimation}
+        disabled={isShuffling || parentOrder.length <= 1}
+        class="parent-order-shuffle-button"
+        class:parent-order-shuffle-button-active={isShuffling}
+        aria-busy={isShuffling}
+        aria-label="親の順番をシャッフル"
+        data-audio="confirm"
+      >
+        <span class="parent-order-shuffle-icon" aria-hidden="true">
+          <Shuffle size={18} strokeWidth={2.5} />
+        </span>
+        <span>{isShuffling ? 'シャッフル中' : 'シャッフル'}</span>
+      </button>
     </div>
 
     <ol class="parent-order-list space-y-2" aria-label="親の順番">
@@ -351,12 +446,17 @@
         <li
           class="parent-order-row"
           class:parent-order-row-dragging={draggingPlayerIndex === playerIndex}
+          class:parent-order-row-shuffling={isShuffling}
+          class:parent-order-row-settled={shuffleSettled}
           data-parent-order-index={position}
+          data-shuffle-tick={shuffleTick}
+          style={`--order-delay: ${position * 24}ms`}
         >
           <button
             type="button"
             class="parent-order-drag-handle"
             aria-label={`${parentName(playerIndex)}をドラッグして並べ替え`}
+            disabled={isShuffling}
             onpointerdown={(event) => handleOrderPointerDown(event, position, playerIndex)}
             onpointermove={handleOrderPointerMove}
             onpointerup={finishOrderPointer}
@@ -371,7 +471,7 @@
               type="button"
               class="parent-order-icon-button"
               aria-label={`${parentName(playerIndex)}を1つ上へ`}
-              disabled={position === 0}
+              disabled={isShuffling || position === 0}
               onclick={() => moveParentOrder(position, position - 1)}
             >
               <ArrowUp size={18} strokeWidth={2.4} aria-hidden="true" />
@@ -380,7 +480,7 @@
               type="button"
               class="parent-order-icon-button"
               aria-label={`${parentName(playerIndex)}を1つ下へ`}
-              disabled={position === parentOrder.length - 1}
+              disabled={isShuffling || position === parentOrder.length - 1}
               onclick={() => moveParentOrder(position, position + 1)}
             >
               <ArrowDown size={18} strokeWidth={2.4} aria-hidden="true" />
@@ -394,6 +494,7 @@
 
     <button
       onclick={submitOrderedStart}
+      disabled={isShuffling}
       data-audio="confirm"
       class="ui-button-primary w-full px-5 py-3 rounded-lg active:scale-[0.98] transition font-bold"
     >

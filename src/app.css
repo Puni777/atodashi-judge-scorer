@@ -666,6 +666,13 @@ button, input {
   background: var(--choice-hover);
 }
 
+.ui-button-primary:disabled,
+.ui-button-secondary:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .ui-button-disabled {
   background: var(--disabled-bg);
   border: 1px solid var(--panel-soft-border);
@@ -758,6 +765,82 @@ button, input {
   color: var(--text-muted);
 }
 
+.parent-order-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.parent-order-shuffle-button {
+  align-items: center;
+  background: var(--accent);
+  border: 1px solid var(--accent-border);
+  border-radius: 0.65rem;
+  box-shadow: var(--accent-shadow);
+  color: var(--accent-text);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+  font-weight: 900;
+  gap: 0.45rem;
+  justify-content: center;
+  min-height: 2.45rem;
+  overflow: hidden;
+  padding: 0.55rem 0.9rem;
+  position: relative;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.parent-order-shuffle-button::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  content: '';
+  inset: -45% auto -45% -35%;
+  opacity: 0;
+  position: absolute;
+  transform: rotate(18deg) translateX(-120%);
+  width: 35%;
+}
+
+.parent-order-shuffle-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.parent-order-shuffle-button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.parent-order-shuffle-button:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.parent-order-shuffle-button-active {
+  animation: parent-order-shuffle-button-pop 720ms ease both;
+}
+
+.parent-order-shuffle-button-active::after {
+  animation: parent-order-shuffle-button-sheen 720ms ease both;
+}
+
+.parent-order-shuffle-icon,
+.parent-order-shuffle-button span {
+  display: inline-flex;
+  position: relative;
+  z-index: 1;
+}
+
+.parent-order-shuffle-button-active .parent-order-shuffle-icon {
+  animation: parent-order-shuffle-icon-spin 620ms cubic-bezier(0.2, 0.85, 0.25, 1.2) both;
+}
+
 .parent-order-list {
   list-style: none;
   margin: 0;
@@ -786,6 +869,20 @@ button, input {
   border-color: var(--accent-border);
   box-shadow: var(--accent-shadow);
   transform: scale(1.01);
+}
+
+.parent-order-row-shuffling {
+  animation: parent-order-row-shuffle 180ms ease-in-out infinite alternate;
+  animation-delay: var(--order-delay);
+  background: var(--accent-row-bg);
+  border-color: var(--accent-border);
+  box-shadow: var(--accent-shadow);
+}
+
+.parent-order-row-settled {
+  animation: parent-order-row-settle 260ms cubic-bezier(0.2, 0.85, 0.25, 1.15) both;
+  animation-delay: var(--order-delay);
+  border-color: var(--accent-border);
 }
 
 .parent-order-drag-handle,
@@ -829,6 +926,11 @@ button, input {
 }
 
 .parent-order-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.parent-order-drag-handle:disabled {
   cursor: not-allowed;
   opacity: 0.38;
 }
@@ -1122,6 +1224,74 @@ button, input {
   padding: 0.65rem 0.75rem;
 }
 
+@keyframes parent-order-shuffle-button-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  42% {
+    transform: scale(1.04);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes parent-order-shuffle-button-sheen {
+  0% {
+    opacity: 0;
+    transform: rotate(18deg) translateX(-140%);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: rotate(18deg) translateX(520%);
+  }
+}
+
+@keyframes parent-order-shuffle-icon-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  48% {
+    transform: rotate(205deg) scale(1.14);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes parent-order-row-shuffle {
+  0% {
+    transform: translate3d(-2px, -1px, 0) rotate(-0.35deg);
+  }
+
+  100% {
+    transform: translate3d(2px, -4px, 0) rotate(0.45deg);
+  }
+}
+
+@keyframes parent-order-row-settle {
+  0% {
+    transform: translateY(-5px) scale(0.99);
+  }
+
+  62% {
+    transform: translateY(2px) scale(1.012);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes gm-cursor-blink {
   50% {
     opacity: 0;
@@ -1292,6 +1462,15 @@ button, input {
     font-size: 0.88rem;
   }
 
+  .parent-order-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .parent-order-shuffle-button {
+    width: 100%;
+  }
+
   .parent-order-row {
     gap: 0.45rem;
     grid-template-columns: auto auto minmax(0, 1fr) auto;
@@ -1311,6 +1490,16 @@ button, input {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .parent-order-row,
+  .parent-order-row-shuffling,
+  .parent-order-row-settled,
+  .parent-order-shuffle-button,
+  .parent-order-shuffle-button::after,
+  .parent-order-shuffle-icon {
+    animation: none;
+    transition: none;
+  }
+
   .gm-cursor {
     animation: none;
   }
