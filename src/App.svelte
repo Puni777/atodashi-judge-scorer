@@ -273,6 +273,18 @@
     safe(() => session.advanceToFinal())
   }
 
+  function handleBackToParentSetup() {
+    safe(() => session.backToParentSetup())
+  }
+
+  function handleBackToFirstJudgment() {
+    safe(() => session.backToFirstJudgment())
+  }
+
+  function handleBackToSecondJudgment() {
+    safe(() => session.backToSecondJudgment())
+  }
+
   function handleSkipFinalJudgment() {
     safe(() => session.skipFinalJudgment())
   }
@@ -591,8 +603,10 @@
           children={session.children()}
           currentJudgments={session.roundState.firstJudgments}
           advanceLabel="親がアイテムを追加 → 次へ"
+          backLabel="ジャッジ選択へ戻る"
           onSelect={handleSubmitFirst}
           onAdvance={handleAdvanceToSecond}
+          onBack={handleBackToParentSetup}
         />
       {:else if session.phase === Phase.SecondJudgment && session.roundState?.judge}
         <JudgmentPhase
@@ -606,8 +620,10 @@
             ? '第2判断が全員一致しました。最終判断をスキップできます。'
             : '親がアイテムを追加したあと、もう一度判断してください'}
           advanceLabel={canSkipFinalJudgment ? '全員一致のためスキップして採点' : '話し合い → 次へ'}
+          backLabel="第1判断へ戻る"
           onSelect={handleSubmitSecond}
           onAdvance={canSkipFinalJudgment ? handleSkipFinalJudgment : handleAdvanceToFinal}
+          onBack={handleBackToFirstJudgment}
         />
       {:else if session.phase === Phase.FinalJudgment && session.roundState?.judge}
         <TimerDisplay timer={session.timer} />
@@ -620,8 +636,10 @@
           prevLabel="第2"
           hint="話し合い + 子のアイテム追加後の最終判断"
           advanceLabel="採点する"
+          backLabel="第2判断へ戻る"
           onSelect={handleSubmitFinal}
           onAdvance={handleFinalize}
+          onBack={handleBackToSecondJudgment}
         />
       {:else if session.phase === Phase.RoundScore && session.roundState}
         <RoundScore

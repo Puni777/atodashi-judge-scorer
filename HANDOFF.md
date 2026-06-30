@@ -1,6 +1,6 @@
 # 引き継ぎ資料: 後出しジャッジ Scorer
 
-最終更新: 2026-06-29
+最終更新: 2026-06-30
 
 この資料は、カードゲーム「後出しジャッジ」の得点計算補助 Web アプリを引き継ぐためのメモです。目的、現在の実装、設計上の決定事項、触るべきファイル、既知の注意点をまとめています。
 
@@ -68,6 +68,7 @@ Svelte 5 の runes を使っています。クラス内 state は `.svelte.ts` �
 - 進行中も表示できるフローティング GM
 - ジャッジカード一覧と検索
 - 第1判断、第2判断、最終判断の入力
+- 判断フェーズ内の戻る操作（ジャッジ選択 / 第1判断 / 第2判断）
 - 前回判断の表示
 - 最終判断フェーズのカウントダウンタイマー
 - 第2判断が全員一致した場合の最終判断スキップ
@@ -135,6 +136,8 @@ atodashi-judge-scorer/
         └── scorer/
             ├── session.svelte.ts
             ├── session.test.ts
+            ├── parentOrder.ts
+            ├── parentOrder.test.ts
             ├── timer.svelte.ts
             ├── timer.test.ts
             ├── judges.ts
@@ -172,6 +175,9 @@ SETUP
 - `submitSecond`
 - `advanceToFinal`
 - `submitFinal`
+- `backToParentSetup`
+- `backToFirstJudgment`
+- `backToSecondJudgment`
 - `finalizeRound`
 - `nextRound`
 - `resetToSetup`
@@ -253,6 +259,14 @@ players[roundIndex % players.length]
    ラウンドごとの得点差分、得点内訳、累計を表示する
 8. GameOver
    最終順位を表示する。同点は同順位
+
+判断フェーズでは、得点前の修正用に以下の戻る操作があります。
+
+- FirstJudgment → ParentSetup: ジャッジ選択に戻る。選択済みジャッジと判断入力をクリアする
+- SecondJudgment → FirstJudgment: 第1判断を保持し、第2判断以降をクリアする
+- FinalJudgment → SecondJudgment: 第1/第2判断を保持し、最終判断とタイマーをリセットする
+
+RoundScore 以降の得点反映後 Undo は未実装です。
 
 GM メッセージは現在フェーズ、入力進捗、タイマー状態に応じて変わります。
 
@@ -413,25 +427,25 @@ npx vite preview
 
 ## 14. 現在の検証状態
 
-2026-06-29 時点の確認結果:
+2026-06-30 時点の確認結果:
 
 - `npm run check`: 0 errors / 0 warnings
-- `npm run test`: 4 files, 53 tests passed
+- `npm run test`: 5 files, 62 tests passed
 - `npm run build`: 成功
 
 ビルドサイズ:
 
 ```text
-dist/index.html                  0.47 kB, gzip 0.33 kB
-dist/assets/index-*.css          31.40 kB, gzip 7.47 kB
-dist/assets/index-*.js           95.08 kB, gzip 32.67 kB
+dist/index.html                  0.49 kB, gzip 0.33 kB
+dist/assets/index-*.css          40.71 kB, gzip 9.12 kB
+dist/assets/index-*.js           124.28 kB, gzip 41.41 kB
 ```
 
 ---
 
 ## 15. テスト構成
 
-テストは 4 ファイル、53 ケースです。
+テストは 5 ファイル、62 ケースです。
 
 - `src/lib/scorer/session.test.ts`
   - フェーズ遷移
@@ -448,6 +462,10 @@ dist/assets/index-*.js           95.08 kB, gzip 32.67 kB
   - イベント購読
   - fake timers
   - snapshot 復元
+- `src/lib/scorer/parentOrder.test.ts`
+  - 親順シャッフル
+  - 元配列非破壊
+  - 同順回避
 - `src/lib/scorer/gmMessages.test.ts`
   - テンプレート置換
   - フェーズ別メッセージ
@@ -522,7 +540,7 @@ import type { Player } from '../types'
 
 現在の既知制限:
 
-- フェーズを戻す Undo は未実装
+- 得点反映後の Undo は未実装
 - ラウンド履歴は `session.history` にあるが、振り返り画面は未実装
 - localStorage はブラウザ単位。複数端末同期はしない
 - 音声はブラウザの自動再生制限を受ける
@@ -531,7 +549,7 @@ import type { Player } from '../types'
 
 今後の拡張候補:
 
-- Undo / 1 フェーズ戻る
+- 得点反映後の Undo
 - ラウンド履歴の振り返り画面
 - テストプレイ後の得点バランス調整
 - 高校生テストプレイ用の説明文や簡易モード

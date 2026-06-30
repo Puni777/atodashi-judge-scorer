@@ -137,6 +137,10 @@ export class ScoreSession {
   setJudge(card: JudgeCard): void {
     this.requireRound()
     this.roundState!.judge = card
+    this.roundState!.firstJudgments = {}
+    this.roundState!.secondJudgments = {}
+    this.roundState!.finalJudgments = {}
+    this.clearRoundScore()
   }
 
   enterFirstJudgment(): void {
@@ -191,6 +195,41 @@ export class ScoreSession {
     this.phase = Phase.RoundScore
     this.timer.stop()
     return deltas
+  }
+
+  backToParentSetup(): void {
+    this.requireRound()
+    if (this.phase !== Phase.FirstJudgment) {
+      throw new Error('第一判断からのみジャッジ選択へ戻れます')
+    }
+    this.roundState!.judge = null
+    this.roundState!.firstJudgments = {}
+    this.roundState!.secondJudgments = {}
+    this.roundState!.finalJudgments = {}
+    this.clearRoundScore()
+    this.phase = Phase.ParentSetup
+  }
+
+  backToFirstJudgment(): void {
+    this.requireRound()
+    if (this.phase !== Phase.SecondJudgment) {
+      throw new Error('第二判断からのみ第一判断へ戻れます')
+    }
+    this.roundState!.secondJudgments = {}
+    this.roundState!.finalJudgments = {}
+    this.clearRoundScore()
+    this.phase = Phase.FirstJudgment
+  }
+
+  backToSecondJudgment(): void {
+    this.requireRound()
+    if (this.phase !== Phase.FinalJudgment) {
+      throw new Error('最終判断からのみ第二判断へ戻れます')
+    }
+    this.roundState!.finalJudgments = {}
+    this.clearRoundScore()
+    this.timer.reset()
+    this.phase = Phase.SecondJudgment
   }
 
   skipFinalJudgment(): IdMap {
@@ -385,6 +424,11 @@ export class ScoreSession {
     if (!Number.isInteger(option) || option < 0 || option >= judge.options.length) {
       throw new Error(`option は 0〜${judge.options.length - 1}`)
     }
+  }
+
+  private clearRoundScore(): void {
+    this.roundState!.scoreDelta = {}
+    this.roundState!.scoreBreakdown = {}
   }
 }
 

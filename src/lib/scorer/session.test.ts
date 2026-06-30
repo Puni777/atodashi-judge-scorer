@@ -401,6 +401,93 @@ describe('ScoreSession', () => {
     expect(s.timer.isRunning).toBe(false)
   })
 
+  it('第一判断からジャッジ選択へ戻るとジャッジと判断入力をクリアする', () => {
+    const s = new ScoreSession()
+    start(s)
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b] = s.children()
+    if (!b) throw new Error('child b should exist')
+    s.submitFirst(b.id, 0)
+
+    s.backToParentSetup()
+
+    expect(s.phase).toBe(Phase.ParentSetup)
+    expect(s.roundState?.judge).toBeNull()
+    expect(s.roundState?.firstJudgments).toEqual({})
+    expect(s.roundState?.secondJudgments).toEqual({})
+    expect(s.roundState?.finalJudgments).toEqual({})
+    expect(s.roundState?.scoreDelta).toEqual({})
+    expect(s.roundState?.scoreBreakdown).toEqual({})
+  })
+
+  it('第二判断から第一判断へ戻ると第一判断だけ保持する', () => {
+    const s = new ScoreSession()
+    start(s)
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b, c] = s.children()
+    if (!b || !c) throw new Error('children should exist')
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 1)
+    s.advanceToSecond()
+    s.submitSecond(b.id, 1)
+
+    s.backToFirstJudgment()
+
+    expect(s.phase).toBe(Phase.FirstJudgment)
+    expect(s.roundState?.firstJudgments).toEqual({ [b.id]: 0, [c.id]: 1 })
+    expect(s.roundState?.secondJudgments).toEqual({})
+    expect(s.roundState?.finalJudgments).toEqual({})
+    expect(s.roundState?.scoreDelta).toEqual({})
+    expect(s.roundState?.scoreBreakdown).toEqual({})
+  })
+
+  it('最終判断から第二判断へ戻ると第二判断まで保持し、最終判断とタイマーをリセットする', () => {
+    const s = new ScoreSession(new CountdownTimer(noopScheduler))
+    start(s, ['A', 'B', 'C'], { totalRounds: null, timerSeconds: 60 })
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    const [b, c] = s.children()
+    if (!b || !c) throw new Error('children should exist')
+    s.submitFirst(b.id, 0)
+    s.submitFirst(c.id, 1)
+    s.advanceToSecond()
+    s.submitSecond(b.id, 1)
+    s.submitSecond(c.id, 1)
+    s.advanceToFinal()
+    s.timer.tick()
+    s.submitFinal(b.id, 1)
+
+    s.backToSecondJudgment()
+
+    expect(s.phase).toBe(Phase.SecondJudgment)
+    expect(s.roundState?.firstJudgments).toEqual({ [b.id]: 0, [c.id]: 1 })
+    expect(s.roundState?.secondJudgments).toEqual({ [b.id]: 1, [c.id]: 1 })
+    expect(s.roundState?.finalJudgments).toEqual({})
+    expect(s.timer.isRunning).toBe(false)
+    expect(s.timer.totalSeconds).toBe(0)
+    expect(s.timer.remainingSeconds).toBe(0)
+    expect(s.timer.expired).toBe(false)
+
+    s.advanceToFinal()
+    expect(s.timer.isRunning).toBe(true)
+    expect(s.timer.totalSeconds).toBe(60)
+    expect(s.timer.remainingSeconds).toBe(60)
+  })
+
+  it('戻るメソッドは対象外フェーズではエラーになる', () => {
+    const s = new ScoreSession()
+    start(s)
+
+    expect(() => s.backToParentSetup()).toThrow()
+    expect(() => s.backToFirstJudgment()).toThrow()
+    expect(() => s.backToSecondJudgment()).toThrow()
+  })
+
   it('standings はスコア降順', () => {
     const s = new ScoreSession()
     start(s, ['A', 'B', 'C'])

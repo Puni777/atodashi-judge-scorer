@@ -976,6 +976,21 @@ button, input {
   border: 1px solid var(--panel-soft-border);
 }
 
+.judgment-actions {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+.judgment-action-button {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.45rem;
+  justify-content: center;
+  min-height: 3rem;
+  width: 100%;
+}
+
 .ui-judgment-row-empty {
   background: var(--panel-soft-bg);
   border-style: dashed;
@@ -1295,6 +1310,12 @@ button, input {
 @keyframes gm-cursor-blink {
   50% {
     opacity: 0;
+  }
+}
+
+@media (min-width: 640px) {
+  .judgment-actions-with-back {
+    grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
   }
 }
 
