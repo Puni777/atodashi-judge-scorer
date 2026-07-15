@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import Flag from 'lucide-svelte/icons/flag'
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw'
   import X from 'lucide-svelte/icons/x'
   import type { ThemeId } from '../lib/types'
@@ -16,8 +17,10 @@
     bgmVolume: number
     audioStatus: AudioLoadStatus
     canResetToSetup: boolean
+    canEndGame: boolean
     onClose: () => void
     onResetToSetup: () => void
+    onEndGame: () => void
     onThemeChange: (themeId: ThemeId) => void
     onFloatingGmChange: (enabled: boolean) => void
     onSeEnabledChange: (enabled: boolean) => void
@@ -36,8 +39,10 @@
     bgmVolume,
     audioStatus,
     canResetToSetup,
+    canEndGame,
     onClose,
     onResetToSetup,
+    onEndGame,
     onThemeChange,
     onFloatingGmChange,
     onSeEnabledChange,
@@ -102,12 +107,25 @@
         {onBgmVolumeChange}
       />
 
-      {#if canResetToSetup}
+      {#if canEndGame || canResetToSetup}
         <div class="options-reset-area">
-          <button type="button" class="options-reset-button" onclick={handleReset} data-audio="confirm">
-            <RotateCcw size={18} strokeWidth={2.4} aria-hidden="true" />
-            <span>セットアップに戻る</span>
-          </button>
+          {#if canEndGame}
+            <button
+              type="button"
+              class="options-reset-button options-end-button"
+              onclick={onEndGame}
+              data-audio="confirm"
+            >
+              <Flag size={18} strokeWidth={2.4} aria-hidden="true" />
+              <span>途中終了して結果を見る</span>
+            </button>
+          {/if}
+          {#if canResetToSetup}
+            <button type="button" class="options-reset-button" onclick={handleReset} data-audio="confirm">
+              <RotateCcw size={18} strokeWidth={2.4} aria-hidden="true" />
+              <span>セットアップに戻る</span>
+            </button>
+          {/if}
         </div>
       {/if}
     </div>

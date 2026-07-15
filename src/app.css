@@ -1393,6 +1393,8 @@ button, input {
 
 .options-reset-area {
   border-top: 1px solid var(--panel-soft-border);
+  display: grid;
+  gap: 0.65rem;
   margin-top: 1.1rem;
   padding-top: 1rem;
 }
@@ -1416,6 +1418,17 @@ button, input {
 .options-reset-button:hover {
   background: var(--danger-bg);
   border-color: var(--danger-text);
+}
+
+.options-end-button {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+.options-end-button:hover {
+  background: var(--warning-bg);
+  border-color: var(--warning-text);
 }
 
 @media (max-width: 420px) {

@@ -347,6 +347,14 @@
     bgmVolume = volume
   }
 
+  function handleEndGameEarly() {
+    const ok = window.confirm(
+      'ゲームをここで終了して最終結果を表示しますか？（採点前のラウンドは破棄されます）',
+    )
+    if (!ok) return
+    if (safe(() => session.endGameEarly())) optionsOpen = false
+  }
+
   function confirmResetToSetup(): boolean {
     const ok = window.confirm(
       'ゲームを初期化してセットアップ画面に戻りますか？現在の進行状況は削除されます。',
@@ -649,6 +657,7 @@
           breakdowns={session.roundState.scoreBreakdown}
           {isLastRound}
           onNext={handleNextRound}
+          onEndEarly={handleEndGameEarly}
         />
       {/if}
     {/if}
@@ -664,8 +673,10 @@
     {bgmVolume}
     {audioStatus}
     canResetToSetup={session.phase !== Phase.Setup || Boolean(pendingResume)}
+    canEndGame={session.phase !== Phase.Setup && session.phase !== Phase.GameOver}
     onClose={() => (optionsOpen = false)}
     onResetToSetup={handleOptionsResetToSetup}
+    onEndGame={handleEndGameEarly}
     onThemeChange={handleThemeChange}
     onFloatingGmChange={handleFloatingGmChange}
     onSeEnabledChange={handleSeEnabledChange}

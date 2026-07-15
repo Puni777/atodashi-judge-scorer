@@ -621,6 +621,50 @@ describe('ScoreSession', () => {
     expect(s.roundState).toBeNull()
     expect(s.history).toEqual([])
   })
+
+  it('endGameEarly: RoundScore 中は現在ラウンドを履歴に残して GameOver へ', () => {
+    const s = new ScoreSession()
+    start(s, ['A', 'B', 'C', 'D', 'E', 'F', 'G'], { totalRounds: 7, timerSeconds: 0 })
+    completeHeldRound(s)
+    expect(s.phase).toBe(Phase.RoundScore)
+    const scoresBefore = s.players.map((p) => p.score)
+
+    s.endGameEarly()
+
+    expect(s.phase).toBe(Phase.GameOver)
+    expect(s.roundState).toBeNull()
+    expect(s.history).toHaveLength(1)
+    expect(s.players.map((p) => p.score)).toEqual(scoresBefore)
+  })
+
+  it('endGameEarly: 判断入力の途中なら現在ラウンドを破棄して GameOver へ', () => {
+    const s = new ScoreSession()
+    start(s, ['A', 'B', 'C'], { totalRounds: 3, timerSeconds: 0 })
+    completeHeldRound(s)
+    s.nextRound()
+    s.enterParentSetup()
+    s.setJudge(JUDGE_2OPT)
+    s.enterFirstJudgment()
+    s.submitFirst(s.children()[0]!.id, 0)
+
+    s.endGameEarly()
+
+    expect(s.phase).toBe(Phase.GameOver)
+    expect(s.roundState).toBeNull()
+    expect(s.history).toHaveLength(1)
+  })
+
+  it('endGameEarly: Setup / GameOver ではエラー', () => {
+    const setup = new ScoreSession()
+    expect(() => setup.endGameEarly()).toThrow()
+
+    const s = new ScoreSession()
+    start(s, ['A', 'B', 'C'], { totalRounds: 1, timerSeconds: 0 })
+    completeHeldRound(s)
+    s.nextRound()
+    expect(s.phase).toBe(Phase.GameOver)
+    expect(() => s.endGameEarly()).toThrow()
+  })
 })
 
 describe('rankedStandings', () => {

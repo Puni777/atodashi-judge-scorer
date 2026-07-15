@@ -1,6 +1,6 @@
 # 引き継ぎ資料: 後出しジャッジ Scorer
 
-最終更新: 2026-06-30
+最終更新: 2026-07-15
 
 この資料は、カードゲーム「後出しジャッジ」の得点計算補助 Web アプリを引き継ぐためのメモです。目的、現在の実装、設計上の決定事項、触るべきファイル、既知の注意点をまとめています。
 
@@ -75,6 +75,7 @@ Svelte 5 の runes を使っています。クラス内 state は `.svelte.ts` �
 - 時間切れアラーム
 - 採点、得点内訳、累計スコア表示
 - 親ローテーション
+- 確認ダイアログ付きのゲーム途中終了（採点前の現在ラウンドは破棄）
 - 同点順位対応の最終結果
 - localStorage による進行中ゲームの保存と再開
 - UI 設定の保存
@@ -163,6 +164,8 @@ SETUP
 → ROUND_SCORE
 → ROUND_START または GAME_OVER
 ```
+
+進行中の各フェーズから、確認後に `GAME_OVER` へ途中終了できます。
 
 主な遷移メソッドは `src/lib/scorer/session.svelte.ts` の `ScoreSession` にあります。
 
@@ -256,7 +259,7 @@ players[roundIndex % players.length]
 6. FinalJudgment
    話し合いと子のアイテム追加後、子全員が最終判断を入力する
 7. RoundScore
-   ラウンドごとの得点差分、得点内訳、累計を表示する
+   ラウンドごとの得点差分、得点内訳、累計を表示する。残りラウンドがあっても、確認後にここで終了できる
 8. GameOver
    最終順位を表示する。同点は同順位
 
@@ -427,25 +430,25 @@ npx vite preview
 
 ## 14. 現在の検証状態
 
-2026-06-30 時点の確認結果:
+2026-07-15 時点の確認結果:
 
 - `npm run check`: 0 errors / 0 warnings
-- `npm run test`: 5 files, 62 tests passed
+- `npm run test`: 5 files, 65 tests passed
 - `npm run build`: 成功
 
 ビルドサイズ:
 
 ```text
 dist/index.html                  0.49 kB, gzip 0.33 kB
-dist/assets/index-*.css          40.71 kB, gzip 9.12 kB
-dist/assets/index-*.js           124.28 kB, gzip 41.41 kB
+dist/assets/index-*.css          40.93 kB, gzip 9.14 kB
+dist/assets/index-*.js           126.01 kB, gzip 41.83 kB
 ```
 
 ---
 
 ## 15. テスト構成
 
-テストは 5 ファイル、62 ケースです。
+テストは 5 ファイル、65 ケースです。
 
 - `src/lib/scorer/session.test.ts`
   - フェーズ遷移
@@ -456,6 +459,7 @@ dist/assets/index-*.js           124.28 kB, gzip 41.41 kB
   - タイマー連携
   - snapshot 復元
   - reset
+  - ゲームの途中終了
   - standings / rankedStandings
 - `src/lib/scorer/timer.test.ts`
   - start / tick / expired / stop

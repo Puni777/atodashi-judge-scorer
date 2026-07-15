@@ -16,6 +16,7 @@
 - 判断フェーズ内の戻る操作（ジャッジ選択 / 第1判断 / 第2判断）
 - 親点、引き込み点、更新点による採点ロジック
 - 親の自動ローテーション
+- 確認ダイアログ付きのゲーム途中終了
 - 話し合いタイマー、時間切れアラーム
 - GMキャラクターによる進行案内
 - BGM / SE、音量調整、ON/OFF
@@ -63,7 +64,7 @@ npm run build
 現状の確認結果:
 
 - `svelte-check`: 0 errors / 0 warnings
-- `vitest`: 5 files, 62 tests passed
+- `vitest`: 5 files, 65 tests passed
 - `vite build`: 成功
 
 ## デプロイ

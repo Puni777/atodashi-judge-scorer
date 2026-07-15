@@ -73,7 +73,8 @@
     'プレイヤー7',
     'プレイヤー8',
   ])
-  let roundsText = $state('')
+  // type="number" の bind:value は数値（空欄・不正入力時は undefined）になる
+  let roundsInput = $state<number | undefined>(undefined)
   let timerMinutes = $state(Math.floor(DEFAULT_TIMER_SECONDS / 60))
   let timerSecondsPart = $state(DEFAULT_TIMER_SECONDS % 60)
   let timerEnabled = $state(true)
@@ -107,10 +108,9 @@
     if (used.some((n) => !n)) { error = 'プレイヤー名を入力してください'; return null }
     if (new Set(used).size !== used.length) { error = 'プレイヤー名が重複しています'; return null }
     let total: number | null = null
-    if (roundsText.trim()) {
-      const parsed = Number.parseInt(roundsText, 10)
-      if (!Number.isFinite(parsed) || parsed < 1) { error = 'ラウンド数は 1 以上の整数で入力してください'; return null }
-      total = parsed
+    if (roundsInput !== undefined) {
+      if (!Number.isInteger(roundsInput) || roundsInput < 1) { error = 'ラウンド数は 1 以上の整数で入力してください'; return null }
+      total = roundsInput
     }
     let timerSeconds = 0
     if (timerEnabled) {
@@ -319,7 +319,7 @@
       <input
         type="number"
         min="1"
-        bind:value={roundsText}
+        bind:value={roundsInput}
         class="ui-input w-32 px-3 py-2 rounded-lg outline-none"
       />
     </div>

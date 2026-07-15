@@ -8,8 +8,9 @@
     breakdowns: ScoreBreakdownMap
     isLastRound: boolean
     onNext: () => void
+    onEndEarly?: () => void
   }
-  let { players, parentId, deltas, breakdowns, isLastRound, onNext }: Props = $props()
+  let { players, parentId, deltas, breakdowns, isLastRound, onNext, onEndEarly }: Props = $props()
 
   function signed(value: number): string {
     return value > 0 ? `+${value}` : `${value}`
@@ -73,4 +74,14 @@
   >
     {isLastRound ? '結果発表' : '次のラウンドへ'}
   </button>
+
+  {#if !isLastRound && onEndEarly}
+    <button
+      onclick={onEndEarly}
+      data-audio="confirm"
+      class="ui-button-secondary w-full px-5 py-3 rounded-lg font-bold active:scale-[0.98] transition"
+    >
+      ここで終了して結果発表
+    </button>
+  {/if}
 </section>

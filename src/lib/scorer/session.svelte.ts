@@ -258,6 +258,25 @@ export class ScoreSession {
     this.beginRound()
   }
 
+  /**
+   * ゲームを途中終了して最終結果へ進む。
+   * 採点済みの現在ラウンド（RoundScore 表示中）は履歴に残し、
+   * 採点前のラウンドは破棄してそれまでの累計スコアで結果を出す。
+   */
+  endGameEarly(): void {
+    this.requireRound()
+    if (this.phase === Phase.Setup || this.phase === Phase.GameOver) {
+      throw new Error('進行中のゲームがありません')
+    }
+    if (this.phase === Phase.RoundScore && this.roundState) {
+      this.history.push(this.roundState)
+      this.roundIndex += 1
+    }
+    this.roundState = null
+    this.timer.reset()
+    this.phase = Phase.GameOver
+  }
+
   // ---- 採点 --------------------------------------------------------------
 
   /**
